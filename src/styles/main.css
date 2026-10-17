@@ -630,6 +630,115 @@ canvas {
 .ch-left { transform: translate(-10px, -50%); }
 .ch-right { transform: translate(10px, -50%); }
 
+/* Death Overlay */
+.death-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.4) 0%, rgba(10, 12, 16, 0.95) 80%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  pointer-events: none;
+  animation: deathPulse 2s infinite alternate;
+}
+
+@keyframes deathPulse {
+  0% { backdrop-filter: blur(4px) grayscale(40%); }
+  100% { backdrop-filter: blur(8px) grayscale(80%); }
+}
+
+.death-card {
+  text-align: center;
+  background: rgba(15, 20, 28, 0.9);
+  border: 2px solid var(--accent-red);
+  padding: 32px 48px;
+  border-radius: 12px;
+  box-shadow: 0 0 50px rgba(239, 68, 68, 0.6);
+}
+
+.death-skull {
+  font-size: 3.5rem;
+  margin-bottom: 8px;
+}
+
+.death-title {
+  color: var(--accent-red);
+  font-size: 2.6rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+}
+
+.death-sub {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 20px;
+}
+
+.death-timer-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.death-countdown {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0.05em;
+}
+
+/* Floating Damage Numbers */
+.damage-numbers-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.dmg-number {
+  position: absolute;
+  font-family: var(--font-tactical);
+  font-weight: 900;
+  font-size: 1.4rem;
+  color: #fbbf24;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.9), 0 0 4px #fbbf24;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: floatFade 0.7s ease-out forwards;
+}
+
+.dmg-number.headshot {
+  color: #ef4444;
+  font-size: 1.7rem;
+  text-shadow: 0 0 12px rgba(0, 0, 0, 0.9), 0 0 8px #ef4444;
+}
+
+@keyframes floatFade {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.8);
+  }
+  30% {
+    transform: translate(0, -20px) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, -45px) scale(1.0);
+  }
+}
+
 /* Hitmarker */
 .hud-hitmarker {
   position: absolute;

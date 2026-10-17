@@ -17,6 +17,9 @@ export class HUD {
   private scoreAlphaEl!: HTMLElement;
   private scoreOmegaEl!: HTMLElement;
   private killFeedEl!: HTMLElement;
+  private deathOverlayEl!: HTMLElement;
+  private deathCountdownEl!: HTMLElement;
+  private damageNumbersContainer!: HTMLElement;
 
   private hitmarkerTimeout: number | null = null;
 
@@ -53,6 +56,9 @@ export class HUD {
       <!-- Damage Direction Flash -->
       <div id="damage-flash" class="damage-flash"></div>
 
+      <!-- Floating Damage Numbers Container -->
+      <div id="damage-numbers-container" class="damage-numbers-container"></div>
+
       <!-- Center Crosshair -->
       <div id="hud-crosshair" class="hud-crosshair">
         <div class="ch-bar ch-top"></div>
@@ -75,6 +81,19 @@ export class HUD {
         <div class="hm-line hm-tr"></div>
         <div class="hm-line hm-bl"></div>
         <div class="hm-line hm-br"></div>
+      </div>
+
+      <!-- Elimination Death Screen Overlay -->
+      <div id="death-overlay" class="death-overlay" style="display: none;">
+        <div class="death-card">
+          <div class="death-skull">💀</div>
+          <h2 class="death-title">OPERATIVE DOWN</h2>
+          <p class="death-sub">ELIMINATED IN ACTION</p>
+          <div class="death-timer-box">
+            <span>RESPAWNING IN</span>
+            <span id="death-countdown" class="death-countdown">3.0s</span>
+          </div>
+        </div>
       </div>
 
       <!-- Bottom Status Cluster -->
@@ -124,6 +143,9 @@ export class HUD {
     this.scoreAlphaEl = this.container.querySelector('#score-alpha')!;
     this.scoreOmegaEl = this.container.querySelector('#score-omega')!;
     this.killFeedEl = this.container.querySelector('#kill-feed')!;
+    this.deathOverlayEl = this.container.querySelector('#death-overlay')!;
+    this.deathCountdownEl = this.container.querySelector('#death-countdown')!;
+    this.damageNumbersContainer = this.container.querySelector('#damage-numbers-container')!;
   }
 
   public updateVitals(stats: PlayerStats): void {
@@ -153,7 +175,7 @@ export class HUD {
   }
 
   public updateCrosshairSpread(spreadPx: number): void {
-    const offset = Math.max(6, Math.min(36, spreadPx));
+    const offset = Math.max(5, Math.min(32, spreadPx));
     const top = this.crosshairEl.querySelector('.ch-top') as HTMLElement;
     const bottom = this.crosshairEl.querySelector('.ch-bottom') as HTMLElement;
     const left = this.crosshairEl.querySelector('.ch-left') as HTMLElement;
@@ -172,14 +194,42 @@ export class HUD {
     this.hitmarkerEl.className = `hud-hitmarker active ${isHeadshot ? 'critical' : ''}`;
     this.hitmarkerTimeout = window.setTimeout(() => {
       this.hitmarkerEl.className = 'hud-hitmarker';
-    }, 120);
+    }, 130);
+  }
+
+  public showDamageNumber(damage: number, isHeadshot: boolean): void {
+    const el = document.createElement('div');
+    el.className = `dmg-number ${isHeadshot ? 'headshot' : ''}`;
+    el.textContent = isHeadshot ? `-${Math.round(damage)} HEADSHOT!` : `-${Math.round(damage)}`;
+
+    // Randomize initial position around center reticle
+    const rx = (Math.random() - 0.5) * 80;
+    const ry = -30 - Math.random() * 40;
+    el.style.transform = `translate(${rx}px, ${ry}px)`;
+
+    this.damageNumbersContainer.appendChild(el);
+    setTimeout(() => {
+      el.remove();
+    }, 700);
   }
 
   public triggerDamageFlash(): void {
     this.damageFlashEl.classList.add('flash');
     setTimeout(() => {
       this.damageFlashEl.classList.remove('flash');
-    }, 200);
+    }, 220);
+  }
+
+  public showDeathOverlay(countdownSec: number): void {
+    this.deathOverlayEl.style.display = 'flex';
+    this.deathCountdownEl.textContent = `${countdownSec.toFixed(1)}s`;
+    this.crosshairEl.style.display = 'none';
+    this.sniperScopeEl.style.display = 'none';
+  }
+
+  public hideDeathOverlay(): void {
+    this.deathOverlayEl.style.display = 'none';
+    this.crosshairEl.style.display = 'block';
   }
 
   public updateMatchInfo(timeRemainingSec: number, alphaScore: number, omegaScore: number): void {

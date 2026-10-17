@@ -9,9 +9,11 @@ export class PlayerController {
   public isGrounded: boolean = true;
   public isCrouching: boolean = false;
   public isSprinting: boolean = false;
+  public isDead: boolean = false;
 
   public pitch: number = 0; // X rotation (vertical look)
   public yaw: number = 0;   // Y rotation (horizontal look)
+  private deathRoll: number = 0;
 
   private cameraHeight: number = 1.7; // default standing height
   private crouchHeight: number = 0.95;
@@ -38,6 +40,7 @@ export class PlayerController {
   private colliders: THREE.Box3[] = [];
   private audioManager: AudioManager;
   public weaponManager: WeaponManager;
+  private viewmodelLight: THREE.PointLight;
 
   // Sensitivity
   public mouseSensitivity: number = 0.0022;
@@ -49,6 +52,12 @@ export class PlayerController {
     this.audioManager = audioManager;
     this.weaponManager = new WeaponManager(this.camera, this.audioManager);
     this.position.set(0, this.currentHeight, -36);
+
+    // Dedicated Viewmodel Keylight attached to camera
+    // Guarantees weapon and tactical hands are beautifully illuminated in any lighting condition
+    this.viewmodelLight = new THREE.PointLight(0xffffff, 2.5, 3.0, 1.2);
+    this.viewmodelLight.position.set(0.15, 0.1, -0.2);
+    this.camera.add(this.viewmodelLight);
   }
 
   public setPosition(pos: THREE.Vector3): void {
@@ -57,7 +66,23 @@ export class PlayerController {
     this.velocity.set(0, 0, 0);
   }
 
+  public triggerDeath(): void {
+    this.isDead = true;
+    this.velocity.set(0, 0, 0);
+    this.weaponManager.currentWeapon.isADS = false;
+  }
+
+  public respawn(spawnPos: THREE.Vector3): void {
+    this.isDead = false;
+    this.deathRoll = 0;
+    this.currentHeight = 1.7;
+    this.pitch = 0;
+    this.setPosition(spawnPos);
+  }
+
   public handleLookDelta(deltaX: number, deltaY: number, isTouch: boolean = false): void {
+    if (this.isDead) return;
+
     const sens = isTouch ? this.touchSensitivity : this.mouseSensitivity;
     // Rotate yaw (horizontal)
     this.yaw -= deltaX * sens;
@@ -84,6 +109,20 @@ export class PlayerController {
     isCrouchPressed: boolean,
     isSprintActive: boolean
   ): void {
+    // --- DEATH ANIMATION HANDLING ---
+    if (this.isDead) {
+      // Smoothly drop camera to floor and tilt sideways
+      this.currentHeight = THREE.MathUtils.lerp(this.currentHeight, 0.35, delta * 5.0);
+      this.deathRoll = THREE.MathUtils.lerp(this.deathRoll, 0.65, delta * 4.0);
+
+      this.camera.position.set(this.position.x, this.position.y - (1.7 - this.currentHeight), this.position.z);
+      this.camera.rotation.set(0, 0, 0);
+      this.camera.rotateY(this.yaw);
+      this.camera.rotateX(this.pitch);
+      this.camera.rotateZ(this.deathRoll);
+      return;
+    }
+
     // 1. Crouch & Height interpolation
     this.isCrouching = isCrouchPressed;
     const targetHeight = this.isCrouching ? this.crouchHeight : 1.7;

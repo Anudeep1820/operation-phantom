@@ -75,13 +75,13 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.15;
     this.container.appendChild(this.renderer.domElement);
 
-    // 2. Scene & Atmospheric Fog
+    // 2. Scene & Bright Atmospheric Twilight Fog (never pitch black)
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0c10);
-    this.scene.fog = new THREE.FogExp2(0x0a0c10, 0.015);
+    this.scene.background = new THREE.Color(0x111622);
+    this.scene.fog = new THREE.FogExp2(0x111622, 0.005);
 
     // 3. Camera
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 400);
@@ -125,6 +125,8 @@ export class Game {
         }
       },
       onPlayerKilled: () => {
+        this.playerController.triggerDeath();
+        this.hud.showDeathOverlay(3.0);
         this.practiceMode.triggerPlayerDeath();
         this.practiceMode.registerBotKill();
       }
@@ -182,7 +184,7 @@ export class Game {
   public startMatch(): void {
     this.audioManager.unlock();
     this.damageSystem.resetPlayer();
-    this.playerController.setPosition(this.mapData.playerSpawn);
+    this.playerController.respawn(this.mapData.playerSpawn);
     this.botManager.initBots(this.mapData.botSpawns, this.mapData.waypoints, 4);
     this.practiceMode.startMatch();
 
@@ -190,6 +192,7 @@ export class Game {
     this.mainMenu.setVisible(false);
     this.matchResults.hideResults();
     this.matchResults.hidePause();
+    this.hud.hideDeathOverlay();
     this.hud.setVisible(true);
     this.inputManager.touchControls.setVisible(true);
 
@@ -295,6 +298,29 @@ export class Game {
       return;
     }
 
+    // --- CHECK ELIMINATION STATE ---
+    if (!this.damageSystem.playerStats.isAlive) {
+      this.hud.showDeathOverlay(this.practiceMode.playerRespawnTimer);
+      this.playerController.update(delta, 0, 0, false, false, false);
+      this.particleManager.update(delta);
+      this.botManager.update(delta, this.playerController.position);
+
+      this.practiceMode.update(delta, () => {
+        // Player respawn ready
+        this.damageSystem.resetPlayer();
+        this.playerController.respawn(this.mapData.playerSpawn);
+        this.hud.hideDeathOverlay();
+      });
+
+      this.hud.updateVitals(this.damageSystem.playerStats);
+      this.hud.updateMatchInfo(
+        this.practiceMode.timeRemaining,
+        this.practiceMode.alphaScore,
+        this.practiceMode.omegaScore
+      );
+      return;
+    }
+
     // 2. Weapon Switch Request
     const switchReq = this.inputManager.consumeWeaponSwitch();
     if (switchReq) {
@@ -350,7 +376,8 @@ export class Game {
     this.practiceMode.update(delta, () => {
       // Player respawn ready
       this.damageSystem.resetPlayer();
-      this.playerController.setPosition(this.mapData.playerSpawn);
+      this.playerController.respawn(this.mapData.playerSpawn);
+      this.hud.hideDeathOverlay();
     });
 
     // 10. Update HUD
@@ -387,6 +414,15 @@ export class Game {
     // Show muzzle flash
     this.particleManager.showMuzzleFlash(muzzleWorld);
 
+    // Eject spent brass shell casing
+    const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    const camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
+    const chamberPos = this.camera.position.clone()
+      .addScaledVector(camRight, 0.14)
+      .addScaledVector(camUp, -0.12)
+      .addScaledVector(new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion), 0.35);
+    this.particleManager.ejectShellCasing(chamberPos, camRight, camUp);
+
     // Raycast hit detection
     const isMoving = this.playerController.velocity.length() > 1.0;
     const spread = currentWeapon.getEffectiveSpread(isMoving, this.playerController.isCrouching);
@@ -395,6 +431,10 @@ export class Game {
     if (hitResult.hit && hitResult.target) {
       this.damageSystem.processPlayerHit(hitResult.target, currentWeapon.stats, hitResult.isHeadshot || false);
       this.hud.triggerHitmarker(hitResult.isHeadshot || false);
+
+      // Display floating damage number
+      const estDamage = hitResult.isHeadshot ? currentWeapon.stats.damage * 2.2 : currentWeapon.stats.damage;
+      this.hud.showDamageNumber(estDamage, hitResult.isHeadshot || false);
 
       if (hitResult.target.health <= 0) {
         this.practiceMode.registerPlayerKill();
