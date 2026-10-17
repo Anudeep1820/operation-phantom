@@ -13,6 +13,7 @@ export class HUD {
   private sniperScopeEl!: HTMLElement;
   private hitmarkerEl!: HTMLElement;
   private damageFlashEl!: HTMLElement;
+  private totemFlashEl!: HTMLElement;
   private matchTimerEl!: HTMLElement;
   private scoreAlphaEl!: HTMLElement;
   private scoreOmegaEl!: HTMLElement;
@@ -20,8 +21,17 @@ export class HUD {
   private deathOverlayEl!: HTMLElement;
   private deathCountdownEl!: HTMLElement;
   private damageNumbersContainer!: HTMLElement;
+  private vehiclePromptEl!: HTMLElement;
+  private vehiclePromptText!: HTMLElement;
+  private totemBadgeEl!: HTMLElement;
 
   private hitmarkerTimeout: number | null = null;
+  private alphaTapCount: number = 0;
+  private alphaTapTimer: number = 0;
+
+  public onOpenCheats: (() => void) | null = null;
+  public onPauseGame: (() => void) | null = null;
+  public onVehicleInteract: (() => void) | null = null;
 
   constructor(parent: HTMLElement) {
     this.container = document.createElement('div');
@@ -34,33 +44,35 @@ export class HUD {
 
   private buildHUD(): void {
     this.container.innerHTML = `
-      <!-- Match Header -->
+      <!-- Match Header Bar -->
       <div class="hud-top-match-bar">
-        <div class="team-score alpha">
+        <!-- Secret Cheat Trigger on ALPHA pill (Triple-tap) -->
+        <div id="score-alpha-box" class="team-score alpha" title="Alpha Squad">
           <span class="team-tag">ALPHA</span>
           <span id="score-alpha" class="score-num">0</span>
         </div>
         <div class="match-time-box">
           <span id="match-timer" class="match-timer">05:00</span>
-          <span class="mode-tag">SKIRMISH</span>
+          <span class="mode-tag">OPEN WORLD COMBAT</span>
         </div>
         <div class="team-score omega">
           <span id="score-omega" class="score-num">0</span>
           <span class="team-tag">OMEGA</span>
         </div>
-        <button id="btn-hud-cheats" class="hud-cheats-btn" aria-label="Operative Cheats">
-          ⚡ CHEATS
+        <!-- Prominent In-Game Pause Button -->
+        <button id="btn-hud-pause" class="hud-pause-btn" aria-label="Pause Game">
+          ⏸ PAUSE
         </button>
       </div>
-
-      <!-- Active Cheats Status Badge -->
-      <div id="active-cheats-banner" class="active-cheats-banner"></div>
 
       <!-- Top Right Kill Feed -->
       <div id="kill-feed" class="kill-feed-container"></div>
 
       <!-- Damage Direction Flash -->
       <div id="damage-flash" class="damage-flash"></div>
+
+      <!-- Golden Totem of Undying Revival Flash -->
+      <div id="totem-flash" class="totem-flash"></div>
 
       <!-- Floating Damage Numbers Container -->
       <div id="damage-numbers-container" class="damage-numbers-container"></div>
@@ -74,11 +86,14 @@ export class HUD {
         <div class="ch-dot"></div>
       </div>
 
-      <!-- Sniper Scope Overlay -->
+      <!-- Sniper Scope Tactical Overlay -->
       <div id="sniper-scope-overlay" class="sniper-scope-overlay">
         <div class="scope-cross-h"></div>
         <div class="scope-cross-v"></div>
         <div class="scope-circle"></div>
+        <div class="scope-red-dot"></div>
+        <div class="scope-ticks-left"></div>
+        <div class="scope-ticks-right"></div>
       </div>
 
       <!-- Hitmarker Feedback -->
@@ -89,6 +104,12 @@ export class HUD {
         <div class="hm-line hm-br"></div>
       </div>
 
+      <!-- Vehicle Interaction Prompt -->
+      <div id="vehicle-prompt" class="vehicle-prompt" style="display: none;">
+        <span class="vp-badge">[E]</span>
+        <span id="vp-text" class="vp-text">DRIVE TACTICAL BUGGY</span>
+      </div>
+
       <!-- Elimination Death Screen Overlay -->
       <div id="death-overlay" class="death-overlay" style="display: none;">
         <div class="death-card">
@@ -96,7 +117,7 @@ export class HUD {
           <h2 class="death-title">OPERATIVE DOWN</h2>
           <p class="death-sub">ELIMINATED IN ACTION</p>
           <div class="death-timer-box">
-            <span>RESPAWNING IN</span>
+            <span>TACTICAL RESPAWN IN</span>
             <span id="death-countdown" class="death-countdown">3.0s</span>
           </div>
         </div>
@@ -104,7 +125,7 @@ export class HUD {
 
       <!-- Bottom Status Cluster -->
       <div class="hud-bottom-bar">
-        <!-- Health & Armor Panel -->
+        <!-- Health, Armor & Totem Panel -->
         <div class="hud-vitals-panel">
           <div class="vital-row health-row">
             <div class="vital-label">HP</div>
@@ -119,6 +140,11 @@ export class HUD {
               <div id="armor-fill" class="vital-bar-fill armor-fill" style="width: 100%"></div>
             </div>
             <div id="armor-val" class="vital-val">100</div>
+          </div>
+          <!-- Totem of Undying Indicator -->
+          <div id="totem-badge" class="totem-badge active">
+            <span class="totem-icon">⚚</span>
+            <span class="totem-label">TOTEM OF UNDYING READY</span>
           </div>
         </div>
 
@@ -145,6 +171,7 @@ export class HUD {
     this.sniperScopeEl = this.container.querySelector('#sniper-scope-overlay')!;
     this.hitmarkerEl = this.container.querySelector('#hud-hitmarker')!;
     this.damageFlashEl = this.container.querySelector('#damage-flash')!;
+    this.totemFlashEl = this.container.querySelector('#totem-flash')!;
     this.matchTimerEl = this.container.querySelector('#match-timer')!;
     this.scoreAlphaEl = this.container.querySelector('#score-alpha')!;
     this.scoreOmegaEl = this.container.querySelector('#score-omega')!;
@@ -152,28 +179,76 @@ export class HUD {
     this.deathOverlayEl = this.container.querySelector('#death-overlay')!;
     this.deathCountdownEl = this.container.querySelector('#death-countdown')!;
     this.damageNumbersContainer = this.container.querySelector('#damage-numbers-container')!;
+    this.vehiclePromptEl = this.container.querySelector('#vehicle-prompt')!;
+    this.vehiclePromptText = this.container.querySelector('#vp-text')!;
+    this.totemBadgeEl = this.container.querySelector('#totem-badge')!;
 
-    const cheatsBtn = this.container.querySelector('#btn-hud-cheats') as HTMLElement;
-    if (cheatsBtn) {
-      cheatsBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (this.onOpenCheats) this.onOpenCheats();
+    // Prominent In-Game Pause Button
+    const pauseBtn = this.container.querySelector('#btn-hud-pause') as HTMLElement;
+    if (pauseBtn) {
+      pauseBtn.addEventListener('click', () => {
+        if (this.onPauseGame) this.onPauseGame();
+      });
+    }
+
+    // Vehicle Prompt Click (for mobile touch interaction!)
+    this.vehiclePromptEl.addEventListener('click', () => {
+      if (this.onVehicleInteract) this.onVehicleInteract();
+    });
+
+    // SECRET CHEAT TRIGGER: Triple-tap ALPHA pill within 1.2 seconds!
+    const alphaBox = this.container.querySelector('#score-alpha-box') as HTMLElement;
+    if (alphaBox) {
+      alphaBox.addEventListener('click', () => {
+        const now = Date.now();
+        if (now - this.alphaTapTimer < 1200) {
+          this.alphaTapCount++;
+          if (this.alphaTapCount >= 3) {
+            this.alphaTapCount = 0;
+            if (this.onOpenCheats) this.onOpenCheats();
+          }
+        } else {
+          this.alphaTapCount = 1;
+        }
+        this.alphaTapTimer = now;
       });
     }
   }
 
-  public onOpenCheats: (() => void) | null = null;
+  public showVehiclePrompt(text: string): void {
+    this.vehiclePromptEl.style.display = 'flex';
+    this.vehiclePromptText.textContent = text;
+  }
 
-  public updateActiveCheats(activeCheats: string[]): void {
-    const banner = this.container.querySelector('#active-cheats-banner') as HTMLElement;
-    if (!banner) return;
-    if (activeCheats.length === 0) {
-      banner.style.display = 'none';
-      banner.innerHTML = '';
+  public hideVehiclePrompt(): void {
+    this.vehiclePromptEl.style.display = 'none';
+  }
+
+  public triggerTotemRevival(): void {
+    this.totemFlashEl.classList.add('flash');
+    this.totemBadgeEl.className = 'totem-badge consumed';
+    this.totemBadgeEl.innerHTML = `<span class="totem-icon">✖</span><span class="totem-label">TOTEM CONSUMED</span>`;
+    setTimeout(() => {
+      this.totemFlashEl.classList.remove('flash');
+    }, 600);
+  }
+
+  public resetTotemBadge(): void {
+    this.totemBadgeEl.className = 'totem-badge active';
+    this.totemBadgeEl.innerHTML = `<span class="totem-icon">⚚</span><span class="totem-label">TOTEM OF UNDYING READY</span>`;
+  }
+
+  public setTotemActive(active: boolean): void {
+    if (active) {
+      this.resetTotemBadge();
     } else {
-      banner.style.display = 'flex';
-      banner.innerHTML = activeCheats.map(c => `<span class="active-cheat-pill">${c}</span>`).join('');
+      this.totemBadgeEl.className = 'totem-badge consumed';
+      this.totemBadgeEl.innerHTML = `<span class="totem-icon">✖</span><span class="totem-label">TOTEM CONSUMED</span>`;
     }
+  }
+
+  public updateActiveCheats(_activeCheats: string[]): void {
+    // Hidden from public HUD view as requested
   }
 
   public updateVitals(stats: PlayerStats): void {
@@ -228,9 +303,8 @@ export class HUD {
   public showDamageNumber(damage: number, isHeadshot: boolean): void {
     const el = document.createElement('div');
     el.className = `dmg-number ${isHeadshot ? 'headshot' : ''}`;
-    el.textContent = isHeadshot ? `-${Math.round(damage)} HEADSHOT!` : `-${Math.round(damage)}`;
+    el.textContent = isHeadshot ? `-${Math.round(damage)} CRITICAL!` : `-${Math.round(damage)}`;
 
-    // Randomize initial position around center reticle
     const rx = (Math.random() - 0.5) * 80;
     const ry = -30 - Math.random() * 40;
     el.style.transform = `translate(${rx}px, ${ry}px)`;

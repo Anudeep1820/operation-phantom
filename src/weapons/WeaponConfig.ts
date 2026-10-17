@@ -59,9 +59,9 @@ export const WEAPON_CONFIGS: Record<WeaponType, WeaponStats> = {
     recoilHorizontal: 0.03,
     recoilRecovery: 6.0,
     automatic: false,
-    adsFov: 24, // strong tactical scope zoom
-    adsSpeed: 8.0,
-    range: 350,
+    adsFov: 16, // deep high-magnification scope zoom
+    adsSpeed: 12.0,
+    range: 400,
     speedMultiplier: 0.85
   }
 };

@@ -18,25 +18,26 @@ export class BotController {
   public isAlive: boolean = true;
   public state: BotState = 'PATROL';
 
+  // Animation joints
+  private leftLeg!: THREE.Group;
+  private rightLeg!: THREE.Group;
+  private leftArm!: THREE.Group;
+  private rightArm!: THREE.Group;
+  private walkCycle: number = 0;
+
   // Navigation & Combat
   private waypoints: THREE.Vector3[] = [];
   private currentWaypointIndex: number = 0;
   private moveSpeed: number = 3.6;
-  private detectionRange: number = 42;
-  private fovAngle: number = Math.PI * 0.75; // 135 deg viewcone
-  private aimAccuracySpread: number = 0.08; // human-like inaccuracy
+  private detectionRange: number = 50;
+  private aimAccuracySpread: number = 0.12; // Realistic human aim error
   private fireCooldown: number = 0;
-  private burstCount: number = 0;
-  private maxBurst: number = 4;
-  private reactionDelay: number = 0.25;
-  private reactionTimer: number = 0;
-  private reloadTimer: number = 0;
+  private reactionDelayTimer: number = 0.7; // Human reaction delay before firing!
   private respawnTimer: number = 0;
 
   // Visuals
-  private baseColor = 0xb91c1c; // Omega Red
-  private visorMat: THREE.MeshBasicMaterial;
-  private bodyMat: THREE.MeshStandardMaterial;
+  private vestMat: THREE.MeshStandardMaterial;
+  private uniformMat: THREE.MeshStandardMaterial;
 
   private scene: THREE.Scene;
   private audioManager: AudioManager;
@@ -61,66 +62,135 @@ export class BotController {
     this.particleManager = particleManager;
     this.colliders = colliders;
 
-    // Create 3D Tactical Bot Mesh
     this.mesh = new THREE.Group();
 
-    this.bodyMat = new THREE.MeshStandardMaterial({
-      color: 0x242830,
-      metalness: 0.6,
-      roughness: 0.4
+    // High quality military materials
+    this.uniformMat = new THREE.MeshStandardMaterial({
+      color: 0x334155, // Tactical slate camo
+      roughness: 0.75,
+      metalness: 0.2
     });
 
-    const armorVestMat = new THREE.MeshStandardMaterial({
-      color: 0x8b1010, // Dark tactical red armor
-      metalness: 0.4,
-      roughness: 0.6
+    this.vestMat = new THREE.MeshStandardMaterial({
+      color: 0x991b1b, // Dark crimson tactical armor vest
+      roughness: 0.5,
+      metalness: 0.5
     });
 
-    this.visorMat = new THREE.MeshBasicMaterial({
-      color: 0xff2222 // Glowing red visor
+    const armorPlateMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.4,
+      metalness: 0.8
     });
 
-    // Torso / Body
-    const bodyGeo = new THREE.BoxGeometry(0.5, 0.75, 0.3);
-    this.bodyMesh = new THREE.Mesh(bodyGeo, armorVestMat);
-    this.bodyMesh.position.set(0, 1.1, 0);
+    const helmetMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.4,
+      metalness: 0.7
+    });
+
+    const visorGlowMat = new THREE.MeshBasicMaterial({
+      color: 0xff3b3b // Glowing red optics
+    });
+
+    // 1. Torso & Ballistic Plate Carrier
+    const torsoGroup = new THREE.Group();
+    const torsoGeo = new THREE.BoxGeometry(0.48, 0.65, 0.28);
+    this.bodyMesh = new THREE.Mesh(torsoGeo, this.vestMat);
+    this.bodyMesh.position.set(0, 1.15, 0);
     this.bodyMesh.castShadow = true;
     (this.bodyMesh as any).botInstance = this;
     (this.bodyMesh as any).isHead = false;
-    this.mesh.add(this.bodyMesh);
+    torsoGroup.add(this.bodyMesh);
 
-    // Legs
-    const legGeo = new THREE.BoxGeometry(0.2, 0.75, 0.22);
-    const legL = new THREE.Mesh(legGeo, this.bodyMat);
-    legL.position.set(-0.14, 0.38, 0);
-    legL.castShadow = true;
-    this.mesh.add(legL);
+    // Ballistic chest plate
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.4, 0.08), armorPlateMat);
+    plate.position.set(0, 1.18, 0.15);
+    torsoGroup.add(plate);
 
-    const legR = new THREE.Mesh(legGeo, this.bodyMat);
-    legR.position.set(0.14, 0.38, 0);
-    legR.castShadow = true;
-    this.mesh.add(legR);
+    // Ammo Mag Pouches on Chest
+    for (let p = -0.12; p <= 0.12; p += 0.12) {
+      const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.16, 0.07), armorPlateMat);
+      pouch.position.set(p, 1.0, 0.18);
+      torsoGroup.add(pouch);
+    }
+    this.mesh.add(torsoGroup);
 
-    // Head (Separate mesh for Headshot Detection!)
-    const headGeo = new THREE.BoxGeometry(0.28, 0.28, 0.28);
-    this.headMesh = new THREE.Mesh(headGeo, this.bodyMat);
-    this.headMesh.position.set(0, 1.62, 0);
+    // 2. Head with Tactical Helmet, Visor & Headset (Headshot Target!)
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 1.62, 0);
+
+    const headGeo = new THREE.BoxGeometry(0.24, 0.26, 0.24);
+    this.headMesh = new THREE.Mesh(headGeo, this.uniformMat);
     this.headMesh.castShadow = true;
     (this.headMesh as any).botInstance = this;
     (this.headMesh as any).isHead = true;
-    this.mesh.add(this.headMesh);
+    headGroup.add(this.headMesh);
 
-    // Visor
-    const visorGeo = new THREE.BoxGeometry(0.24, 0.08, 0.06);
-    const visor = new THREE.Mesh(visorGeo, this.visorMat);
-    visor.position.set(0, 1.62, 0.13);
-    this.mesh.add(visor);
+    // Combat Helmet Shell
+    const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.28), helmetMat);
+    helmet.position.set(0, 0.07, 0);
+    headGroup.add(helmet);
 
-    // Bot Weapon (procedural carbine held in front)
-    const gunGeo = new THREE.BoxGeometry(0.08, 0.1, 0.45);
-    const gun = new THREE.Mesh(gunGeo, this.bodyMat);
-    gun.position.set(0.22, 1.15, 0.25);
-    this.mesh.add(gun);
+    // Tactical Visor / NVG Goggles
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.07, 0.08), visorGlowMat);
+    visor.position.set(0, 0.02, 0.13);
+    headGroup.add(visor);
+
+    this.mesh.add(headGroup);
+
+    // 3. Limbs with Joints for Walking Animation
+    // Left Leg
+    this.leftLeg = new THREE.Group();
+    this.leftLeg.position.set(-0.14, 0.85, 0);
+    const legGeo = new THREE.BoxGeometry(0.18, 0.8, 0.2);
+    const legLMesh = new THREE.Mesh(legGeo, this.uniformMat);
+    legLMesh.position.set(0, -0.4, 0);
+    legLMesh.castShadow = true;
+    this.leftLeg.add(legLMesh);
+
+    // Knee pad
+    const kneeL = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.14, 0.06), armorPlateMat);
+    kneeL.position.set(0, -0.38, 0.11);
+    this.leftLeg.add(kneeL);
+    this.mesh.add(this.leftLeg);
+
+    // Right Leg
+    this.rightLeg = new THREE.Group();
+    this.rightLeg.position.set(0.14, 0.85, 0);
+    const legRMesh = new THREE.Mesh(legGeo, this.uniformMat);
+    legRMesh.position.set(0, -0.4, 0);
+    legRMesh.castShadow = true;
+    this.rightLeg.add(legRMesh);
+
+    const kneeR = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.14, 0.06), armorPlateMat);
+    kneeR.position.set(0, -0.38, 0.11);
+    this.rightLeg.add(kneeR);
+    this.mesh.add(this.rightLeg);
+
+    // Left Arm
+    this.leftArm = new THREE.Group();
+    this.leftArm.position.set(-0.3, 1.4, 0);
+    const armGeo = new THREE.BoxGeometry(0.15, 0.65, 0.16);
+    const armLMesh = new THREE.Mesh(armGeo, this.uniformMat);
+    armLMesh.position.set(0, -0.3, 0.12);
+    armLMesh.rotation.x = -0.4;
+    this.leftArm.add(armLMesh);
+    this.mesh.add(this.leftArm);
+
+    // Right Arm & Weapon
+    this.rightArm = new THREE.Group();
+    this.rightArm.position.set(0.3, 1.4, 0);
+    const armRMesh = new THREE.Mesh(armGeo, this.uniformMat);
+    armRMesh.position.set(0, -0.3, 0.15);
+    armRMesh.rotation.x = -0.65;
+    this.rightArm.add(armRMesh);
+
+    // Modeled Tactical Rifle in bot hands
+    const rifle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.65), armorPlateMat);
+    rifle.position.set(-0.15, -0.35, 0.35);
+    this.rightArm.add(rifle);
+    this.mesh.add(this.rightArm);
 
     this.scene.add(this.mesh);
     this.spawn(spawnPos);
@@ -141,9 +211,8 @@ export class BotController {
     if (!this.isAlive) return { killed: false, finalDamage: 0 };
 
     let damage = amount;
-    if (isHeadshot) damage *= 2.2;
+    if (isHeadshot) damage *= 2.5;
 
-    // Armor absorption: absorbs 50% damage
     if (this.armor > 0) {
       const absorbed = Math.min(this.armor, damage * 0.5);
       this.armor -= absorbed;
@@ -151,8 +220,6 @@ export class BotController {
     }
 
     this.health -= damage;
-
-    // Flash body red
     this.flashHit();
 
     if (this.health <= 0) {
@@ -160,38 +227,39 @@ export class BotController {
       return { killed: true, finalDamage: damage };
     }
 
-    // Retaliate if damaged
     this.state = 'ENGAGE';
     return { killed: false, finalDamage: damage };
   }
 
   private flashHit(): void {
-    this.bodyMat.color.setHex(0xffffff);
+    this.vestMat.color.setHex(0xffffff);
     setTimeout(() => {
-      this.bodyMat.color.setHex(0x242830);
+      this.vestMat.color.setHex(0x991b1b);
     }, 80);
   }
 
   public die(): void {
     this.isAlive = false;
     this.state = 'DEAD';
-    this.respawnTimer = 4.0; // 4 second respawn delay
+    this.respawnTimer = 4.0;
     this.audioManager.playElimination();
 
-    // Death fall animation: tilt backward
     this.mesh.rotation.x = -Math.PI / 2;
     this.mesh.position.y = 0.2;
   }
 
-  public update(delta: number, playerPos: THREE.Vector3, onShootPlayer?: (dmg: number) => void, isFrozen: boolean = false): void {
-    if (isFrozen) {
-      return; // Frozen in place by operative override cheat!
-    }
+  public update(
+    delta: number,
+    playerPos: THREE.Vector3,
+    onShootPlayer?: (dmg: number) => void,
+    isFrozen: boolean = false,
+    canShootThisTick: boolean = true
+  ): void {
+    if (isFrozen) return;
 
     if (!this.isAlive) {
       this.respawnTimer -= delta;
       if (this.respawnTimer <= 0) {
-        // Respawn at a waypoint
         const randWp = this.waypoints[Math.floor(Math.random() * this.waypoints.length)];
         this.mesh.rotation.x = 0;
         this.mesh.position.y = 0;
@@ -200,26 +268,21 @@ export class BotController {
       return;
     }
 
-    // Update position sync
     this.position.set(this.mesh.position.x, 0, this.mesh.position.z);
-
-    // Vector to player
     const toPlayer = new THREE.Vector3().subVectors(playerPos, this.mesh.position);
     const distToPlayer = toPlayer.length();
-
-    // Check Line of Sight
     const hasLOS = distToPlayer < this.detectionRange && this.checkLineOfSight(playerPos);
 
     if (hasLOS) {
       this.state = 'ENGAGE';
     } else if (this.state === 'ENGAGE') {
-      // Lost sight, return to patrol after small search
       this.state = 'PATROL';
+      this.reactionDelayTimer = 0.7; // Reset reaction time
     }
 
     if (this.state === 'ENGAGE') {
-      this.handleEngage(delta, playerPos, toPlayer, distToPlayer, onShootPlayer);
-    } else if (this.state === 'PATROL') {
+      this.handleEngage(delta, toPlayer, distToPlayer, onShootPlayer, canShootThisTick);
+    } else {
       this.handlePatrol(delta);
     }
   }
@@ -230,11 +293,10 @@ export class BotController {
     const ray = new THREE.Ray(origin, dir);
     const dist = origin.distanceTo(targetPos);
 
-    // Check against all static world colliders
     for (const box of this.colliders) {
       const hit = ray.intersectBox(box, new THREE.Vector3());
       if (hit && origin.distanceTo(hit) < dist - 0.5) {
-        return false; // wall blocks line of sight
+        return false;
       }
     }
     return true;
@@ -242,49 +304,47 @@ export class BotController {
 
   private handleEngage(
     delta: number,
-    playerPos: THREE.Vector3,
     toPlayer: THREE.Vector3,
     dist: number,
-    onShootPlayer?: (dmg: number) => void
+    onShootPlayer?: (dmg: number) => void,
+    canShootThisTick: boolean = true
   ): void {
-    // Face player
     const angle = Math.atan2(toPlayer.x, toPlayer.z);
     this.mesh.rotation.y = angle;
 
-    // Tactical strafing / advance
-    if (dist > 14) {
+    // Tactical repositioning & walking
+    if (dist > 16) {
       const forward = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
-      this.mesh.position.addScaledVector(forward, this.moveSpeed * 0.7 * delta);
+      this.mesh.position.addScaledVector(forward, this.moveSpeed * 0.6 * delta);
+      this.animateLegs(delta, 1.5);
+    } else {
+      this.resetLegs();
     }
 
-    // Fire logic
-    this.fireCooldown -= delta;
-    if (this.fireCooldown <= 0) {
-      // Shoot at player
-      this.fireWeapon(onShootPlayer, dist);
-      this.burstCount++;
+    // Reaction delay before firing
+    if (this.reactionDelayTimer > 0) {
+      this.reactionDelayTimer -= delta;
+      return;
+    }
 
-      if (this.burstCount >= this.maxBurst) {
-        this.burstCount = 0;
-        this.fireCooldown = 0.9 + Math.random() * 0.5; // burst pause
-      } else {
-        this.fireCooldown = 0.12; // automatic rate
-      }
+    // Coordinated Firing: Only fires if authorized to prevent unfair multi-bot firing!
+    this.fireCooldown -= delta;
+    if (this.fireCooldown <= 0 && canShootThisTick) {
+      this.fireWeapon(onShootPlayer, dist);
+      this.fireCooldown = 1.2 + Math.random() * 0.8; // Controlled human cadence
     }
   }
 
   private fireWeapon(onShootPlayer?: (dmg: number) => void, dist: number = 10): void {
-    const muzzlePos = new THREE.Vector3(0.22, 1.15, 0.45).applyMatrix4(this.mesh.matrixWorld);
+    const muzzlePos = new THREE.Vector3(0.25, 1.15, 0.7).applyMatrix4(this.mesh.matrixWorld);
     this.particleManager.showMuzzleFlash(muzzlePos);
     this.audioManager.playGunshot('AR7');
 
-    // Bot accuracy check based on distance
-    const hitChance = Math.max(0.2, 0.75 - (dist / 40) * 0.4);
-    if (Math.random() < hitChance) {
-      if (onShootPlayer) {
-        const damage = 10 + Math.floor(Math.random() * 8);
-        onShootPlayer(damage);
-      }
+    // Human-like distance falloff accuracy
+    const hitChance = Math.max(0.18, 0.65 - (dist / 40) * 0.35);
+    if (Math.random() < hitChance && onShootPlayer) {
+      const damage = 8 + Math.floor(Math.random() * 8);
+      onShootPlayer(damage);
     }
   }
 
@@ -296,14 +356,26 @@ export class BotController {
     toWp.y = 0;
     const dist = toWp.length();
 
-    if (dist < 1.5) {
-      // Pick next waypoint
+    if (dist < 2.0) {
       this.currentWaypointIndex = (this.currentWaypointIndex + 1) % this.waypoints.length;
     } else {
       toWp.normalize();
       const angle = Math.atan2(toWp.x, toWp.z);
       this.mesh.rotation.y = angle;
       this.mesh.position.addScaledVector(toWp, this.moveSpeed * delta);
+      this.animateLegs(delta, 2.0);
     }
+  }
+
+  private animateLegs(delta: number, speedMultiplier: number): void {
+    this.walkCycle += delta * 7.0 * speedMultiplier;
+    const legSwing = Math.sin(this.walkCycle) * 0.45;
+    this.leftLeg.rotation.x = legSwing;
+    this.rightLeg.rotation.x = -legSwing;
+  }
+
+  private resetLegs(): void {
+    this.leftLeg.rotation.x = 0;
+    this.rightLeg.rotation.x = 0;
   }
 }

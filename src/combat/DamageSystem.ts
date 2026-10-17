@@ -58,7 +58,12 @@ export class DamageSystem {
     return result;
   }
 
-  public damagePlayer(amount: number, attackerName: string = 'Enemy', isGodMode: boolean = false): void {
+  public damagePlayer(
+    amount: number,
+    attackerName: string = 'Enemy',
+    isGodMode: boolean = false,
+    onTotemSave?: () => boolean
+  ): void {
     if (!this.playerStats.isAlive || isGodMode) {
       // In God Mode, ensure health and armor remain 100%
       if (isGodMode) {
@@ -75,9 +80,18 @@ export class DamageSystem {
       damage -= absorbed * 0.5;
     }
 
-    this.playerStats.health = Math.max(0, this.playerStats.health - damage);
-    this.callbacks.onPlayerDamaged(damage, this.playerStats.health, this.playerStats.armor);
+    const nextHealth = this.playerStats.health - damage;
 
+    // Check Totem of Undying protection before death
+    if (nextHealth <= 0 && onTotemSave && onTotemSave()) {
+      this.playerStats.health = 100;
+      this.playerStats.armor = 50;
+      this.callbacks.onPlayerDamaged(0, this.playerStats.health, this.playerStats.armor);
+      return;
+    }
+
+    this.playerStats.health = Math.max(0, nextHealth);
+    this.callbacks.onPlayerDamaged(damage, this.playerStats.health, this.playerStats.armor);
 
     if (this.playerStats.health <= 0) {
       this.playerStats.isAlive = false;

@@ -20,6 +20,7 @@ export class InputManager {
   public wantsReload: boolean = false;
   public isPauseRequested: boolean = false;
   public isCheatRequested: boolean = false;
+  public isInteractRequested: boolean = false;
 
   constructor(domElement: HTMLElement) {
     this.domElement = domElement;
@@ -33,6 +34,9 @@ export class InputManager {
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
 
+      if (e.code === 'KeyE') {
+        this.isInteractRequested = true;
+      }
       if (e.code === 'KeyR') {
         this.wantsReload = true;
       }
@@ -188,6 +192,13 @@ export class InputManager {
     const res = this.isCheatRequested || this.touchControls.state.isCheatRequested;
     this.isCheatRequested = false;
     this.touchControls.state.isCheatRequested = false;
+    return res;
+  }
+
+  public consumeVehicleInteract(): boolean {
+    const res = this.isInteractRequested || this.touchControls.state.isVehicleInteractRequested;
+    this.isInteractRequested = false;
+    this.touchControls.state.isVehicleInteractRequested = false;
     return res;
   }
 }

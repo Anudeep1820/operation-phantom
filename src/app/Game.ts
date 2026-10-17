@@ -16,6 +16,8 @@ import { MainMenu } from '../ui/MainMenu';
 import { SettingsMenu } from '../ui/SettingsMenu';
 import { MatchResults } from '../ui/MatchResults';
 import { CheatMenu } from '../ui/CheatMenu';
+import { TotemSystem } from '../combat/TotemSystem';
+import { VehicleController } from '../vehicles/VehicleController';
 
 export class Game {
   private container: HTMLElement;
@@ -34,6 +36,8 @@ export class Game {
   private playerController!: PlayerController;
   private practiceMode!: PracticeMode;
   private cheatManager!: CheatManager;
+  private totemSystem!: TotemSystem;
+  private vehicleController!: VehicleController;
   private mapData!: MapData;
 
   // UI Layers
@@ -45,6 +49,7 @@ export class Game {
 
   // State
   public state: GameState = 'MENU';
+  public isDrivingVehicle: boolean = false;
   private lastFrameTime: number = performance.now();
   private wasMouseDown: boolean = false;
 
@@ -82,13 +87,13 @@ export class Game {
     this.renderer.toneMappingExposure = 1.15;
     this.container.appendChild(this.renderer.domElement);
 
-    // 2. Scene & Bright Atmospheric Fog
+    // 2. Scene & Azure Daylight Atmospheric Fog (Zero Darkness!)
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x111622);
-    this.scene.fog = new THREE.FogExp2(0x111622, 0.005);
+    this.scene.background = new THREE.Color(0x87ceeb);
+    this.scene.fog = new THREE.FogExp2(0xdbeafe, 0.002);
 
     // 3. Camera
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 400);
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 500);
     this.scene.add(this.camera);
 
     // 4. Audio Manager
@@ -107,11 +112,22 @@ export class Game {
     // 8. Cheat Manager
     this.cheatManager = new CheatManager(this.scene, this.audioManager, this.botManager);
 
-    // 9. Player Controller
+    // 9. Totem of Undying System
+    this.totemSystem = new TotemSystem(this.audioManager);
+
+    // 10. Tactical Vehicle Buggy
+    this.vehicleController = new VehicleController(
+      this.mapData.vehicleSpawn,
+      this.scene,
+      this.audioManager,
+      this.mapData.colliders
+    );
+
+    // 11. Player Controller
     this.playerController = new PlayerController(this.camera, this.mapData.colliders, this.audioManager);
     this.playerController.setPosition(this.mapData.playerSpawn);
 
-    // 10. Combat Systems
+    // 12. Combat Systems
     this.hitDetection = new HitDetection(
       this.camera,
       this.scene,
@@ -139,7 +155,7 @@ export class Game {
       }
     });
 
-    // 11. Practice Match Mode
+    // 13. Practice Match Mode
     this.practiceMode = new PracticeMode({ targetScore: 15, matchDurationSec: 300 }, (isVictory) => {
       this.handleMatchEnd(isVictory);
     });
@@ -211,8 +227,10 @@ export class Game {
       }
     });
 
-    // Wire Cheat button on HUD
+    // Wire HUD Callbacks
     this.hud.onOpenCheats = () => this.openCheatMenu();
+    this.hud.onPauseGame = () => this.handlePause();
+    this.hud.onVehicleInteract = () => this.toggleVehicleInteract();
 
     // 16. Window Listeners
     window.addEventListener('resize', () => this.handleResize());
@@ -227,10 +245,45 @@ export class Game {
     this.inputManager.exitPointerLock();
   }
 
+  public toggleVehicleInteract(): void {
+    if (this.isDrivingVehicle) {
+      // Exit vehicle
+      this.isDrivingVehicle = false;
+      this.vehicleController.isOccupied = false;
+      const exitPos = this.vehicleController.position.clone().add(new THREE.Vector3(-2.4, 0, 0));
+      this.playerController.setPosition(exitPos);
+      this.camera.position.set(exitPos.x, exitPos.y + 1.65, exitPos.z);
+      this.playerController.weaponManager.currentWeapon.modelData.mesh.visible = true;
+      this.hud.showVehiclePrompt('DRIVE TACTICAL BUGGY [E]');
+      this.inputManager.touchControls.setVehicleMode(false);
+    } else {
+      const dist = this.playerController.position.distanceTo(this.vehicleController.position);
+      if (dist < 6.5) {
+        // Mount vehicle
+        this.isDrivingVehicle = true;
+        this.vehicleController.isOccupied = true;
+        this.playerController.weaponManager.currentWeapon.modelData.mesh.visible = false;
+        this.hud.showVehiclePrompt('EXIT TACTICAL VEHICLE [E]');
+        this.inputManager.touchControls.setVehicleMode(true);
+      }
+    }
+  }
+
   public startMatch(): void {
     this.audioManager.unlock();
     this.damageSystem.resetPlayer();
+    this.totemSystem.reset();
+    this.hud.setTotemActive(true);
+    this.hud.hideVehiclePrompt();
+
+    this.isDrivingVehicle = false;
+    this.vehicleController.isOccupied = false;
+    this.vehicleController.position.copy(this.mapData.vehicleSpawn);
+    this.vehicleController.speed = 0;
+    this.vehicleController.yaw = 0;
+
     this.playerController.respawn(this.mapData.playerSpawn);
+    this.playerController.weaponManager.currentWeapon.modelData.mesh.visible = true;
     this.botManager.initBots(this.mapData.botSpawns, this.mapData.waypoints, 4);
     this.practiceMode.startMatch();
 
@@ -342,16 +395,36 @@ export class Game {
   };
 
   private updatePlaying(delta: number, currentTime: number): void {
-    // 1. Check Cheat Request
+    // 1. Check Cheat Request (Desktop ~ / F1 or Mobile secret tap)
     if (this.inputManager.consumeCheatRequest()) {
       this.openCheatMenu();
       return;
     }
 
-    // 2. Check Pause Request
+    // 2. Check Pause Request (ESC or HUD ⏸ Pause button)
     if (this.inputManager.consumePauseRequest()) {
       this.handlePause();
       return;
+    }
+
+    // 3. Update Totem System
+    this.totemSystem.update(delta);
+
+    // 4. Check Vehicle Interact Request (KeyE or Mobile DRIVE button)
+    if (this.inputManager.consumeVehicleInteract()) {
+      this.toggleVehicleInteract();
+    }
+
+    // Vehicle Proximity Prompt
+    const distToVehicle = this.playerController.position.distanceTo(this.vehicleController.position);
+    if (this.isDrivingVehicle) {
+      this.hud.showVehiclePrompt('EXIT TACTICAL VEHICLE [E]');
+      this.inputManager.touchControls.setVehicleMode(true);
+    } else if (distToVehicle < 6.5) {
+      this.hud.showVehiclePrompt('DRIVE TACTICAL BUGGY [E]');
+      this.inputManager.touchControls.setVehicleMode(false);
+    } else {
+      this.hud.hideVehiclePrompt();
     }
 
     // --- CHECK ELIMINATION STATE ---
@@ -364,6 +437,8 @@ export class Game {
       this.practiceMode.update(delta, () => {
         // Player respawn ready
         this.damageSystem.resetPlayer();
+        this.totemSystem.reset();
+        this.hud.setTotemActive(true);
         this.playerController.respawn(this.mapData.playerSpawn);
         this.hud.hideDeathOverlay();
       });
@@ -377,67 +452,124 @@ export class Game {
       return;
     }
 
-    // 3. Weapon Switch Request
-    const switchReq = this.inputManager.consumeWeaponSwitch();
-    if (switchReq) {
-      this.playerController.weaponManager.switchWeapon(switchReq);
-    }
-
-    // 4. Reload Request
-    if (this.inputManager.consumeReload()) {
-      this.playerController.weaponManager.currentWeapon.reload();
-    }
-
-    // 5. Movement & Look (with Super Speed and Moon Jump cheats)
     const moveInput = this.inputManager.getMovementInput();
     const lookInput = this.inputManager.getLookDelta();
-
-    this.playerController.handleLookDelta(lookInput.deltaX, lookInput.deltaY, lookInput.isTouch);
-    this.playerController.update(
-      delta,
-      moveInput.moveX,
-      moveInput.moveZ,
-      moveInput.isJump,
-      moveInput.isCrouch,
-      moveInput.isSprint,
-      this.cheatManager.state.superSpeed,
-      this.cheatManager.state.superJump
-    );
-
-    // 6. ADS Sync
-    this.playerController.weaponManager.currentWeapon.isADS = this.inputManager.isADS();
-
-    // 7. Firing Logic (with Infinite Ammo cheat)
-    const isFireHeld = this.inputManager.isFiring();
     const currentWeapon = this.playerController.weaponManager.currentWeapon;
 
-    if (isFireHeld) {
-      const canFireNow = currentWeapon.stats.automatic || !this.wasMouseDown;
-      if (canFireNow) {
-        if (currentWeapon.shoot(currentTime, this.cheatManager.state.infiniteAmmo)) {
-          this.handlePlayerShot(currentWeapon);
+    if (this.isDrivingVehicle) {
+      // --- DRIVING TACTICAL BUGGY MODE ---
+      this.vehicleController.update(
+        delta,
+        moveInput.moveZ,
+        moveInput.moveX,
+        (crushedBot) => {
+          this.damageSystem.playerStats.kills++;
+          this.hud.addKillFeedEntry({
+            id: Math.random().toString(36).substring(2, 9),
+            killer: 'OPERATIVE (BUGGY)',
+            victim: crushedBot.name,
+            weapon: 'TACTICAL BUGGY',
+            isHeadshot: false,
+            isPlayerKill: true,
+            timestamp: Date.now()
+          });
+          this.practiceMode.registerPlayerKill();
+          this.hud.showDamageNumber(300, true);
+        },
+        this.botManager.getBots()
+      );
+
+      // Lock player model & seat position to buggy
+      const seatPos = this.vehicleController.getDriverSeatWorldPos();
+      this.playerController.setPosition(seatPos);
+
+      // Chase camera third-person view
+      const targetCamPos = this.vehicleController.getChaseCameraPos();
+      this.camera.position.lerp(targetCamPos, 0.2);
+      this.camera.lookAt(this.vehicleController.getLookTarget());
+
+      // Hide first person viewmodel while driving
+      currentWeapon.modelData.mesh.visible = false;
+    } else {
+      // --- FOOT COMBAT MODE ---
+      // Update vehicle idle physics (roll to stop)
+      this.vehicleController.update(delta, 0, 0);
+
+      // 5. Weapon Switch Request
+      const switchReq = this.inputManager.consumeWeaponSwitch();
+      if (switchReq) {
+        this.playerController.weaponManager.switchWeapon(switchReq);
+      }
+
+      // 6. Reload Request
+      if (this.inputManager.consumeReload()) {
+        currentWeapon.reload();
+      }
+
+      // 7. Movement & Look
+      this.playerController.handleLookDelta(lookInput.deltaX, lookInput.deltaY, lookInput.isTouch);
+      this.playerController.update(
+        delta,
+        moveInput.moveX,
+        moveInput.moveZ,
+        moveInput.isJump,
+        moveInput.isCrouch,
+        moveInput.isSprint,
+        this.cheatManager.state.superSpeed,
+        this.cheatManager.state.superJump
+      );
+
+      // 8. ADS Sync
+      currentWeapon.isADS = this.inputManager.isADS();
+
+      // 9. Firing Logic (with Infinite Ammo cheat)
+      const isFireHeld = this.inputManager.isFiring();
+      if (isFireHeld) {
+        const canFireNow = currentWeapon.stats.automatic || !this.wasMouseDown;
+        if (canFireNow) {
+          if (currentWeapon.shoot(currentTime, this.cheatManager.state.infiniteAmmo)) {
+            this.handlePlayerShot(currentWeapon);
+          }
         }
       }
+      this.wasMouseDown = isFireHeld;
     }
-    this.wasMouseDown = isFireHeld;
 
-    // 8. Update Particles & Cheats
+    // 10. Update Particles & Cheats
     this.particleManager.update(delta);
     this.cheatManager.update(delta);
 
-    // 9. Update Bots (with God Mode and Freeze Bots cheats)
+    // 11. Update Bots (with Totem of Undying, God Mode and Freeze Bots cheats)
     this.botManager.update(
       delta,
       this.playerController.position,
       (dmg) => {
-        this.damageSystem.damagePlayer(dmg, 'Omega Bot', this.cheatManager.state.godMode);
+        if (this.totemSystem.isInvulnerable) return;
+
+        this.damageSystem.damagePlayer(
+          dmg,
+          'Omega Bot',
+          this.cheatManager.state.godMode,
+          () => {
+            if (this.totemSystem.hasTotem) {
+              const saved = this.totemSystem.triggerTotem();
+              if (saved) {
+                this.hud.triggerTotemRevival();
+                return true;
+              }
+            }
+            return false;
+          }
+        );
       },
       this.cheatManager.state.freezeBots
     );
 
-    // 10. Update Practice Mode
+    // 12. Update Practice Mode
     this.practiceMode.update(delta, () => {
       this.damageSystem.resetPlayer();
+      this.totemSystem.reset();
+      this.hud.setTotemActive(true);
       this.playerController.respawn(this.mapData.playerSpawn);
       this.hud.hideDeathOverlay();
     });

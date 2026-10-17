@@ -12,6 +12,7 @@ export interface TouchInputState {
   switchWeaponRequest: number | null; // 1, 2, or 3
   isPauseRequested: boolean;
   isCheatRequested: boolean;
+  isVehicleInteractRequested: boolean;
 }
 
 export class TouchControls {
@@ -29,7 +30,8 @@ export class TouchControls {
     wantsReload: false,
     switchWeaponRequest: null,
     isPauseRequested: false,
-    isCheatRequested: false
+    isCheatRequested: false,
+    isVehicleInteractRequested: false
   };
 
   private joystickContainer!: HTMLElement;
@@ -100,6 +102,12 @@ export class TouchControls {
             <span class="btn-label">CROUCH</span>
           </button>
 
+          <!-- Vehicle Drive / Exit Button -->
+          <button id="touch-vehicle-btn" class="touch-btn vehicle-btn" aria-label="Drive or Exit Vehicle">
+            <span class="btn-icon">🚗</span>
+            <span class="btn-label">DRIVE</span>
+          </button>
+
           <!-- Primary Fire Trigger Button -->
           <button id="touch-fire-btn" class="touch-btn fire-btn" aria-label="Fire Weapon">
             <div class="fire-inner-ring">
@@ -109,9 +117,8 @@ export class TouchControls {
         </div>
       </div>
 
-      <!-- Mobile Top Bar: Pause & Cheats Buttons -->
+      <!-- Mobile Top Bar: Pause Button Only (Cheats Hidden) -->
       <div class="touch-top-bar">
-        <button id="touch-cheats-btn" class="touch-btn cheat-btn" aria-label="Operative Cheats">⚡</button>
         <button id="touch-pause-btn" class="touch-btn pause-btn" aria-label="Pause Menu">⏸</button>
       </div>
     `;
@@ -240,19 +247,26 @@ export class TouchControls {
       });
     });
 
-    // --- PAUSE & CHEATS BUTTONS ---
+    // --- PAUSE & VEHICLE BUTTONS ---
     const pauseBtn = this.container.querySelector('#touch-pause-btn') as HTMLElement;
     pauseBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.state.isPauseRequested = true;
     });
 
-    const cheatBtn = this.container.querySelector('#touch-cheats-btn') as HTMLElement;
-    if (cheatBtn) {
-      cheatBtn.addEventListener('pointerdown', (e) => {
+    const vehicleBtn = this.container.querySelector('#touch-vehicle-btn') as HTMLElement;
+    if (vehicleBtn) {
+      vehicleBtn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        this.state.isCheatRequested = true;
+        this.state.isVehicleInteractRequested = true;
       });
+    }
+  }
+
+  public setVehicleMode(inVehicle: boolean): void {
+    const vehicleBtn = this.container.querySelector('#touch-vehicle-btn .btn-label') as HTMLElement;
+    if (vehicleBtn) {
+      vehicleBtn.textContent = inVehicle ? 'EXIT' : 'DRIVE';
     }
   }
 

@@ -44,6 +44,10 @@ export class BotManager {
     }
   }
 
+  public getBots(): BotController[] {
+    return this.bots;
+  }
+
   public getTargetMeshes(): THREE.Mesh[] {
     const meshes: THREE.Mesh[] = [];
     for (const b of this.bots) {
@@ -55,9 +59,22 @@ export class BotManager {
     return meshes;
   }
 
+  private nextAllowedFireTime: number = 0;
+
   public update(delta: number, playerPos: THREE.Vector3, onShootPlayer?: (dmg: number) => void, isFrozen: boolean = false): void {
+    const now = performance.now() / 1000;
+    let tokenClaimed = false;
+
     for (const b of this.bots) {
-      b.update(delta, playerPos, onShootPlayer, isFrozen);
+      // Only 1 bot can shoot during this tick if the global cooldown has elapsed
+      const canShoot = !tokenClaimed && (now >= this.nextAllowedFireTime);
+
+      b.update(delta, playerPos, (dmg) => {
+        if (onShootPlayer) onShootPlayer(dmg);
+        // Stagger next bot fire by 0.6s to 0.9s
+        this.nextAllowedFireTime = now + 0.65;
+        tokenClaimed = true;
+      }, isFrozen, canShoot);
     }
   }
 

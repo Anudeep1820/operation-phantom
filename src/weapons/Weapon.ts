@@ -155,6 +155,13 @@ export class Weapon {
       this.modelData.defaultRotation.y,
       this.modelData.defaultRotation.z
     );
+
+    // For high-magnification sniper optics (Longshot), hide gun viewmodel when fully scoped
+    if (this.stats.id === 'LONGSHOT') {
+      this.modelData.mesh.visible = this.adsAlpha < 0.8;
+    } else {
+      this.modelData.mesh.visible = true;
+    }
   }
 
   public getEffectiveSpread(isMoving: boolean, isCrouching: boolean): number {
