@@ -4,6 +4,7 @@ import { AudioManager } from '../core/AudioManager';
 import { InputManager } from '../core/InputManager';
 import { PerformanceManager } from '../core/PerformanceManager';
 import { ParticleManager } from '../effects/ParticleManager';
+import { CheatManager } from '../core/CheatManager';
 import { NeonDistrict, MapData } from '../maps/NeonDistrict';
 import { PlayerController } from '../player/PlayerController';
 import { BotManager } from '../ai/BotManager';
@@ -14,6 +15,7 @@ import { HUD } from '../ui/HUD';
 import { MainMenu } from '../ui/MainMenu';
 import { SettingsMenu } from '../ui/SettingsMenu';
 import { MatchResults } from '../ui/MatchResults';
+import { CheatMenu } from '../ui/CheatMenu';
 
 export class Game {
   private container: HTMLElement;
@@ -31,6 +33,7 @@ export class Game {
   private botManager!: BotManager;
   private playerController!: PlayerController;
   private practiceMode!: PracticeMode;
+  private cheatManager!: CheatManager;
   private mapData!: MapData;
 
   // UI Layers
@@ -38,6 +41,7 @@ export class Game {
   private mainMenu!: MainMenu;
   private settingsMenu!: SettingsMenu;
   private matchResults!: MatchResults;
+  private cheatMenu!: CheatMenu;
 
   // State
   public state: GameState = 'MENU';
@@ -78,7 +82,7 @@ export class Game {
     this.renderer.toneMappingExposure = 1.15;
     this.container.appendChild(this.renderer.domElement);
 
-    // 2. Scene & Bright Atmospheric Twilight Fog (never pitch black)
+    // 2. Scene & Bright Atmospheric Fog
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x111622);
     this.scene.fog = new THREE.FogExp2(0x111622, 0.005);
@@ -100,11 +104,14 @@ export class Game {
     // 7. Bot Manager
     this.botManager = new BotManager(this.scene, this.audioManager, this.particleManager, this.mapData.colliders);
 
-    // 8. Player Controller
+    // 8. Cheat Manager
+    this.cheatManager = new CheatManager(this.scene, this.audioManager, this.botManager);
+
+    // 9. Player Controller
     this.playerController = new PlayerController(this.camera, this.mapData.colliders, this.audioManager);
     this.playerController.setPosition(this.mapData.playerSpawn);
 
-    // 9. Combat Systems
+    // 10. Combat Systems
     this.hitDetection = new HitDetection(
       this.camera,
       this.scene,
@@ -132,19 +139,19 @@ export class Game {
       }
     });
 
-    // 10. Practice Match Mode
+    // 11. Practice Match Mode
     this.practiceMode = new PracticeMode({ targetScore: 15, matchDurationSec: 300 }, (isVictory) => {
       this.handleMatchEnd(isVictory);
     });
 
-    // 11. Performance Manager
+    // 12. Performance Manager
     this.performanceManager = new PerformanceManager(this.container, this.renderer);
     this.performanceManager.setVisible(this.settings.showFps);
 
-    // 12. Input Manager
+    // 13. Input Manager
     this.inputManager = new InputManager(this.renderer.domElement);
 
-    // 13. UI Systems
+    // 14. UI Systems
     this.hud = new HUD(this.container);
     this.hud.setVisible(false);
     this.inputManager.touchControls.setVisible(false);
@@ -173,12 +180,51 @@ export class Game {
       }
     });
 
-    // 14. Window Listeners
+    // 15. Cheat Menu UI
+    this.cheatMenu = new CheatMenu(this.container, this.cheatManager, {
+      onClose: () => {
+        if (this.state === 'PLAYING') {
+          this.inputManager.requestPointerLock();
+        }
+      },
+      onNuke: () => {
+        this.cheatManager.nukeAllBots((bot) => {
+          this.damageSystem.playerStats.kills++;
+          this.hud.addKillFeedEntry({
+            id: Math.random().toString(36).substring(2, 9),
+            killer: 'OPERATIVE',
+            victim: bot.name,
+            weapon: 'TACTICAL NUKE',
+            isHeadshot: true,
+            isPlayerKill: true,
+            timestamp: Date.now()
+          });
+          this.practiceMode.registerPlayerKill();
+        });
+        this.hud.showDamageNumber(9999, true);
+      },
+      onHeal: () => {
+        this.damageSystem.playerStats.health = 100;
+        this.damageSystem.playerStats.armor = 100;
+        this.hud.updateVitals(this.damageSystem.playerStats);
+        this.audioManager.playReload('magIn');
+      }
+    });
+
+    // Wire Cheat button on HUD
+    this.hud.onOpenCheats = () => this.openCheatMenu();
+
+    // 16. Window Listeners
     window.addEventListener('resize', () => this.handleResize());
     window.addEventListener('blur', () => this.handlePause());
 
-    // 15. Start Loop
+    // 17. Start Loop
     this.animate();
+  }
+
+  public openCheatMenu(): void {
+    this.cheatMenu.setVisible(true);
+    this.inputManager.exitPointerLock();
   }
 
   public startMatch(): void {
@@ -192,6 +238,7 @@ export class Game {
     this.mainMenu.setVisible(false);
     this.matchResults.hideResults();
     this.matchResults.hidePause();
+    this.cheatMenu.setVisible(false);
     this.hud.hideDeathOverlay();
     this.hud.setVisible(true);
     this.inputManager.touchControls.setVisible(true);
@@ -202,6 +249,7 @@ export class Game {
 
   public handlePause(): void {
     if (this.state !== 'PLAYING') return;
+    if (this.cheatMenu.isVisible()) return; // Don't trigger pause if cheat menu is open
     this.state = 'PAUSED';
     this.matchResults.showPause();
     this.inputManager.exitPointerLock();
@@ -220,6 +268,7 @@ export class Game {
     this.inputManager.touchControls.setVisible(false);
     this.matchResults.hidePause();
     this.matchResults.hideResults();
+    this.cheatMenu.setVisible(false);
     this.mainMenu.setVisible(true);
     this.inputManager.exitPointerLock();
     this.botManager.clear();
@@ -230,6 +279,7 @@ export class Game {
     this.inputManager.exitPointerLock();
     this.hud.setVisible(false);
     this.inputManager.touchControls.setVisible(false);
+    this.cheatMenu.setVisible(false);
     this.matchResults.showResults(
       isVictory,
       this.damageSystem.playerStats,
@@ -292,7 +342,13 @@ export class Game {
   };
 
   private updatePlaying(delta: number, currentTime: number): void {
-    // 1. Check Pause Request
+    // 1. Check Cheat Request
+    if (this.inputManager.consumeCheatRequest()) {
+      this.openCheatMenu();
+      return;
+    }
+
+    // 2. Check Pause Request
     if (this.inputManager.consumePauseRequest()) {
       this.handlePause();
       return;
@@ -321,18 +377,18 @@ export class Game {
       return;
     }
 
-    // 2. Weapon Switch Request
+    // 3. Weapon Switch Request
     const switchReq = this.inputManager.consumeWeaponSwitch();
     if (switchReq) {
       this.playerController.weaponManager.switchWeapon(switchReq);
     }
 
-    // 3. Reload Request
+    // 4. Reload Request
     if (this.inputManager.consumeReload()) {
       this.playerController.weaponManager.currentWeapon.reload();
     }
 
-    // 4. Movement & Look
+    // 5. Movement & Look (with Super Speed and Moon Jump cheats)
     const moveInput = this.inputManager.getMovementInput();
     const lookInput = this.inputManager.getLookDelta();
 
@@ -343,44 +399,50 @@ export class Game {
       moveInput.moveZ,
       moveInput.isJump,
       moveInput.isCrouch,
-      moveInput.isSprint
+      moveInput.isSprint,
+      this.cheatManager.state.superSpeed,
+      this.cheatManager.state.superJump
     );
 
-    // 5. ADS Sync
+    // 6. ADS Sync
     this.playerController.weaponManager.currentWeapon.isADS = this.inputManager.isADS();
 
-    // 6. Firing Logic
+    // 7. Firing Logic (with Infinite Ammo cheat)
     const isFireHeld = this.inputManager.isFiring();
     const currentWeapon = this.playerController.weaponManager.currentWeapon;
 
     if (isFireHeld) {
-      // Automatic rifles fire continuously; semi-auto pistols/snipers require fresh press
       const canFireNow = currentWeapon.stats.automatic || !this.wasMouseDown;
       if (canFireNow) {
-        if (currentWeapon.shoot(currentTime)) {
+        if (currentWeapon.shoot(currentTime, this.cheatManager.state.infiniteAmmo)) {
           this.handlePlayerShot(currentWeapon);
         }
       }
     }
     this.wasMouseDown = isFireHeld;
 
-    // 7. Update Particles
+    // 8. Update Particles & Cheats
     this.particleManager.update(delta);
+    this.cheatManager.update(delta);
 
-    // 8. Update Bots
-    this.botManager.update(delta, this.playerController.position, (dmg) => {
-      this.damageSystem.damagePlayer(dmg, 'Omega Bot');
-    });
+    // 9. Update Bots (with God Mode and Freeze Bots cheats)
+    this.botManager.update(
+      delta,
+      this.playerController.position,
+      (dmg) => {
+        this.damageSystem.damagePlayer(dmg, 'Omega Bot', this.cheatManager.state.godMode);
+      },
+      this.cheatManager.state.freezeBots
+    );
 
-    // 9. Update Practice Mode
+    // 10. Update Practice Mode
     this.practiceMode.update(delta, () => {
-      // Player respawn ready
       this.damageSystem.resetPlayer();
       this.playerController.respawn(this.mapData.playerSpawn);
       this.hud.hideDeathOverlay();
     });
 
-    // 10. Update HUD
+    // 11. Update HUD & Active Cheats Badge
     const isMoving = Math.abs(moveInput.moveX) > 0.1 || Math.abs(moveInput.moveZ) > 0.1;
     const spreadVal = currentWeapon.getEffectiveSpread(isMoving, moveInput.isCrouch) * 600;
     this.hud.updateCrosshairSpread(spreadVal);
@@ -396,10 +458,34 @@ export class Game {
       this.practiceMode.alphaScore,
       this.practiceMode.omegaScore
     );
+
+    // Update Active Cheats Pills on HUD
+    const activeCheats: string[] = [];
+    if (this.cheatManager.state.godMode) activeCheats.push('🛡️ GOD MODE');
+    if (this.cheatManager.state.infiniteAmmo) activeCheats.push('♾️ INF AMMO');
+    if (this.cheatManager.state.oneShotKill) activeCheats.push('💥 INSTA-KILL');
+    if (this.cheatManager.state.superSpeed) activeCheats.push('⚡ SPEED');
+    if (this.cheatManager.state.superJump) activeCheats.push('🚀 MOON JUMP');
+    if (this.cheatManager.state.aimbot) activeCheats.push('🎯 AIMBOT');
+    if (this.cheatManager.state.wallhack) activeCheats.push('👁️ ESP');
+    if (this.cheatManager.state.freezeBots) activeCheats.push('🧊 FROZEN');
+    this.hud.updateActiveCheats(activeCheats);
   }
 
   private handlePlayerShot(currentWeapon: any): void {
     this.damageSystem.recordShot();
+
+    // Aimbot auto-lock snap
+    if (this.cheatManager.state.aimbot) {
+      const cameraDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+      const aimTarget = this.cheatManager.findAimbotTarget(this.camera.position, cameraDir);
+      if (aimTarget) {
+        this.camera.lookAt(aimTarget);
+        const euler = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ');
+        this.playerController.yaw = euler.y;
+        this.playerController.pitch = euler.x;
+      }
+    }
 
     // Recoil kick to camera
     this.playerController.applyRecoil(
@@ -429,12 +515,18 @@ export class Game {
     const hitResult = this.hitDetection.fireRaycast(spread, currentWeapon.stats.range, muzzleWorld);
 
     if (hitResult.hit && hitResult.target) {
-      this.damageSystem.processPlayerHit(hitResult.target, currentWeapon.stats, hitResult.isHeadshot || false);
-      this.hud.triggerHitmarker(hitResult.isHeadshot || false);
+      const isOneShot = this.cheatManager.state.oneShotKill;
+      this.damageSystem.processPlayerHit(
+        hitResult.target,
+        currentWeapon.stats,
+        hitResult.isHeadshot || false,
+        isOneShot
+      );
+      this.hud.triggerHitmarker(hitResult.isHeadshot || false || isOneShot);
 
       // Display floating damage number
-      const estDamage = hitResult.isHeadshot ? currentWeapon.stats.damage * 2.2 : currentWeapon.stats.damage;
-      this.hud.showDamageNumber(estDamage, hitResult.isHeadshot || false);
+      const estDamage = isOneShot ? 9999 : (hitResult.isHeadshot ? currentWeapon.stats.damage * 2.2 : currentWeapon.stats.damage);
+      this.hud.showDamageNumber(estDamage, hitResult.isHeadshot || false || isOneShot);
 
       if (hitResult.target.health <= 0) {
         this.practiceMode.registerPlayerKill();

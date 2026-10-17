@@ -70,3 +70,15 @@ export interface KillFeedEntry {
   isPlayerKill: boolean;
   timestamp: number;
 }
+
+export interface CheatState {
+  godMode: boolean;
+  infiniteAmmo: boolean;
+  oneShotKill: boolean;
+  superSpeed: boolean;
+  superJump: boolean;
+  aimbot: boolean;
+  wallhack: boolean;
+  freezeBots: boolean;
+}
+

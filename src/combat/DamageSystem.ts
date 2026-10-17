@@ -36,10 +36,11 @@ export class DamageSystem {
     this.playerStats.accuracy.shotsFired++;
   }
 
-  public processPlayerHit(targetBot: BotController, weapon: WeaponStats, isHeadshot: boolean): void {
+  public processPlayerHit(targetBot: BotController, weapon: WeaponStats, isHeadshot: boolean, isOneShot: boolean = false): { killed: boolean; finalDamage: number } {
     this.playerStats.accuracy.shotsHit++;
 
-    const result = targetBot.takeDamage(weapon.damage, isHeadshot, 'Operative (You)');
+    const baseDmg = isOneShot ? 9999 : weapon.damage;
+    const result = targetBot.takeDamage(baseDmg, isHeadshot, 'Operative (You)');
     if (result.killed) {
       this.playerStats.kills++;
       if (isHeadshot) this.playerStats.headshots++;
@@ -48,16 +49,24 @@ export class DamageSystem {
         id: Math.random().toString(36).substring(2, 9),
         killer: 'OPERATIVE',
         victim: targetBot.name,
-        weapon: weapon.name,
+        weapon: isOneShot ? 'OVERRIDE' : weapon.name,
         isHeadshot,
         isPlayerKill: true,
         timestamp: Date.now()
       });
     }
+    return result;
   }
 
-  public damagePlayer(amount: number, attackerName: string = 'Enemy'): void {
-    if (!this.playerStats.isAlive) return;
+  public damagePlayer(amount: number, attackerName: string = 'Enemy', isGodMode: boolean = false): void {
+    if (!this.playerStats.isAlive || isGodMode) {
+      // In God Mode, ensure health and armor remain 100%
+      if (isGodMode) {
+        this.playerStats.health = 100;
+        this.playerStats.armor = 100;
+      }
+      return;
+    }
 
     let damage = amount;
     if (this.playerStats.armor > 0) {
@@ -68,6 +77,7 @@ export class DamageSystem {
 
     this.playerStats.health = Math.max(0, this.playerStats.health - damage);
     this.callbacks.onPlayerDamaged(damage, this.playerStats.health, this.playerStats.armor);
+
 
     if (this.playerStats.health <= 0) {
       this.playerStats.isAlive = false;

@@ -27,16 +27,16 @@ export class Weapon {
     this.modelData = WeaponModelGenerator.createWeaponModel(stats.id);
   }
 
-  public canShoot(currentTime: number): boolean {
+  public canShoot(currentTime: number, isInfiniteAmmo: boolean = false): boolean {
     return (
       !this.isReloading &&
-      this.currentAmmo > 0 &&
+      (isInfiniteAmmo || this.currentAmmo > 0) &&
       currentTime >= this.nextFireTime
     );
   }
 
-  public shoot(currentTime: number): boolean {
-    if (!this.canShoot(currentTime)) {
+  public shoot(currentTime: number, isInfiniteAmmo: boolean = false): boolean {
+    if (!this.canShoot(currentTime, isInfiniteAmmo)) {
       if (this.currentAmmo <= 0 && !this.isReloading && currentTime >= this.nextFireTime) {
         this.audioManager.playEmptyClick();
         this.nextFireTime = currentTime + 0.25;
@@ -44,7 +44,12 @@ export class Weapon {
       return false;
     }
 
-    this.currentAmmo--;
+    if (!isInfiniteAmmo) {
+      this.currentAmmo--;
+    } else {
+      this.currentAmmo = this.stats.magCapacity;
+      this.reserveAmmo = this.stats.maxReserveAmmo;
+    }
     const fireInterval = 60 / this.stats.fireRate;
     this.nextFireTime = currentTime + fireInterval;
 

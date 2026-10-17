@@ -183,7 +183,11 @@ export class BotController {
     this.mesh.position.y = 0.2;
   }
 
-  public update(delta: number, playerPos: THREE.Vector3, onShootPlayer?: (dmg: number) => void): void {
+  public update(delta: number, playerPos: THREE.Vector3, onShootPlayer?: (dmg: number) => void, isFrozen: boolean = false): void {
+    if (isFrozen) {
+      return; // Frozen in place by operative override cheat!
+    }
+
     if (!this.isAlive) {
       this.respawnTimer -= delta;
       if (this.respawnTimer <= 0) {

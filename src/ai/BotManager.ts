@@ -55,9 +55,9 @@ export class BotManager {
     return meshes;
   }
 
-  public update(delta: number, playerPos: THREE.Vector3, onShootPlayer?: (dmg: number) => void): void {
+  public update(delta: number, playerPos: THREE.Vector3, onShootPlayer?: (dmg: number) => void, isFrozen: boolean = false): void {
     for (const b of this.bots) {
-      b.update(delta, playerPos, onShootPlayer);
+      b.update(delta, playerPos, onShootPlayer, isFrozen);
     }
   }
 

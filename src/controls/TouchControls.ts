@@ -11,6 +11,7 @@ export interface TouchInputState {
   wantsReload: boolean;
   switchWeaponRequest: number | null; // 1, 2, or 3
   isPauseRequested: boolean;
+  isCheatRequested: boolean;
 }
 
 export class TouchControls {
@@ -27,7 +28,8 @@ export class TouchControls {
     isSprint: false,
     wantsReload: false,
     switchWeaponRequest: null,
-    isPauseRequested: false
+    isPauseRequested: false,
+    isCheatRequested: false
   };
 
   private joystickContainer!: HTMLElement;
@@ -107,8 +109,9 @@ export class TouchControls {
         </div>
       </div>
 
-      <!-- Mobile Top Bar: Pause Button -->
+      <!-- Mobile Top Bar: Pause & Cheats Buttons -->
       <div class="touch-top-bar">
+        <button id="touch-cheats-btn" class="touch-btn cheat-btn" aria-label="Operative Cheats">⚡</button>
         <button id="touch-pause-btn" class="touch-btn pause-btn" aria-label="Pause Menu">⏸</button>
       </div>
     `;
@@ -237,12 +240,20 @@ export class TouchControls {
       });
     });
 
-    // --- PAUSE BUTTON ---
+    // --- PAUSE & CHEATS BUTTONS ---
     const pauseBtn = this.container.querySelector('#touch-pause-btn') as HTMLElement;
     pauseBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.state.isPauseRequested = true;
     });
+
+    const cheatBtn = this.container.querySelector('#touch-cheats-btn') as HTMLElement;
+    if (cheatBtn) {
+      cheatBtn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        this.state.isCheatRequested = true;
+      });
+    }
   }
 
   private handleJoystickMove(clientX: number, clientY: number): void {

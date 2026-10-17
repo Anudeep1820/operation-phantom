@@ -48,7 +48,13 @@ export class HUD {
           <span id="score-omega" class="score-num">0</span>
           <span class="team-tag">OMEGA</span>
         </div>
+        <button id="btn-hud-cheats" class="hud-cheats-btn" aria-label="Operative Cheats">
+          ⚡ CHEATS
+        </button>
       </div>
+
+      <!-- Active Cheats Status Badge -->
+      <div id="active-cheats-banner" class="active-cheats-banner"></div>
 
       <!-- Top Right Kill Feed -->
       <div id="kill-feed" class="kill-feed-container"></div>
@@ -146,6 +152,28 @@ export class HUD {
     this.deathOverlayEl = this.container.querySelector('#death-overlay')!;
     this.deathCountdownEl = this.container.querySelector('#death-countdown')!;
     this.damageNumbersContainer = this.container.querySelector('#damage-numbers-container')!;
+
+    const cheatsBtn = this.container.querySelector('#btn-hud-cheats') as HTMLElement;
+    if (cheatsBtn) {
+      cheatsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.onOpenCheats) this.onOpenCheats();
+      });
+    }
+  }
+
+  public onOpenCheats: (() => void) | null = null;
+
+  public updateActiveCheats(activeCheats: string[]): void {
+    const banner = this.container.querySelector('#active-cheats-banner') as HTMLElement;
+    if (!banner) return;
+    if (activeCheats.length === 0) {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+    } else {
+      banner.style.display = 'flex';
+      banner.innerHTML = activeCheats.map(c => `<span class="active-cheat-pill">${c}</span>`).join('');
+    }
   }
 
   public updateVitals(stats: PlayerStats): void {

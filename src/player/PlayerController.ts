@@ -107,7 +107,9 @@ export class PlayerController {
     inputMoveZ: number,
     isJumpPressed: boolean,
     isCrouchPressed: boolean,
-    isSprintActive: boolean
+    isSprintActive: boolean,
+    superSpeed: boolean = false,
+    superJump: boolean = false
   ): void {
     // --- DEATH ANIMATION HANDLING ---
     if (this.isDead) {
@@ -128,9 +130,12 @@ export class PlayerController {
     const targetHeight = this.isCrouching ? this.crouchHeight : 1.7;
     this.currentHeight = THREE.MathUtils.lerp(this.currentHeight, targetHeight, delta * 12.0);
 
-    // 2. Movement Speeds
+    // 2. Movement Speeds (with Super Speed cheat override)
     this.isSprinting = isSprintActive && !this.isCrouching && inputMoveZ > 0;
     let baseSpeed = this.isCrouching ? this.crouchSpeed : this.isSprinting ? this.sprintSpeed : this.walkSpeed;
+    if (superSpeed) {
+      baseSpeed *= 2.5; // Flash speed!
+    }
     baseSpeed *= this.weaponManager.currentWeapon.stats.speedMultiplier;
 
     // 3. Movement Direction relative to camera yaw
@@ -152,11 +157,12 @@ export class PlayerController {
     this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, targetVelX, delta * accelRate);
     this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, targetVelZ, delta * accelRate);
 
-    // 5. Jump & Gravity
+    // 5. Jump & Gravity (with Super Jump cheat override)
+    const effectiveJumpForce = superJump ? this.jumpForce * 2.2 : this.jumpForce;
     if (this.isGrounded) {
       this.velocity.y = 0;
       if (isJumpPressed && !this.isCrouching) {
-        this.velocity.y = this.jumpForce;
+        this.velocity.y = effectiveJumpForce;
         this.isGrounded = false;
         this.audioManager.playFootstep();
       }

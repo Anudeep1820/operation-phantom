@@ -19,6 +19,7 @@ export class InputManager {
   public switchWeaponRequest: WeaponType | null = null;
   public wantsReload: boolean = false;
   public isPauseRequested: boolean = false;
+  public isCheatRequested: boolean = false;
 
   constructor(domElement: HTMLElement) {
     this.domElement = domElement;
@@ -46,6 +47,9 @@ export class InputManager {
       }
       if (e.code === 'Escape') {
         this.isPauseRequested = true;
+      }
+      if (e.code === 'Backquote' || e.code === 'F1') {
+        this.isCheatRequested = true;
       }
     });
 
@@ -179,4 +183,12 @@ export class InputManager {
     this.touchControls.state.isPauseRequested = false;
     return res;
   }
+
+  public consumeCheatRequest(): boolean {
+    const res = this.isCheatRequested || this.touchControls.state.isCheatRequested;
+    this.isCheatRequested = false;
+    this.touchControls.state.isCheatRequested = false;
+    return res;
+  }
 }
+
