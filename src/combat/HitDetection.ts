@@ -45,24 +45,40 @@ export class HitDetection {
     this.raycaster.set(this.camera.position, rayDir);
     this.raycaster.far = range;
 
-    // Collect interactable targets: Bot hitboxes + Map meshes
-    const botTargets = this.botManager.getTargetMeshes();
-    const hits = this.raycaster.intersectObjects([...botTargets, this.scene], true);
+    // Intersect the scene
+    const hits = this.raycaster.intersectObjects(this.scene.children, true);
 
     let finalHit: THREE.Intersection | null = null;
     let hitBotInstance: any = null;
     let isHead = false;
 
     for (const h of hits) {
-      // Ignore invisible viewmodels or helper meshes
+      // Ignore invisible meshes
       if (!h.object.visible) continue;
       // Ignore weapon models attached to camera
       if (this.isDescendantOf(h.object, this.camera)) continue;
+      // Ignore vehicle meshes (so buggy never blocks gun shots)
+      if ((h.object as any).isVehicle || this.hasAncestorFlag(h.object, 'isVehicle')) continue;
+
+      // Check if this object or any parent belongs to a bot
+      let curr: THREE.Object3D | null = h.object;
+      let foundBot: any = null;
+      let foundHead = false;
+
+      while (curr && curr !== this.scene) {
+        if ((curr as any).botInstance) {
+          foundBot = (curr as any).botInstance;
+        }
+        if ((curr as any).isHead === true) {
+          foundHead = true;
+        }
+        curr = curr.parent;
+      }
 
       finalHit = h;
-      if ((h.object as any).botInstance) {
-        hitBotInstance = (h.object as any).botInstance;
-        isHead = (h.object as any).isHead === true;
+      if (foundBot && foundBot.isAlive) {
+        hitBotInstance = foundBot;
+        isHead = foundHead;
       }
       break;
     }
@@ -102,6 +118,15 @@ export class HitDetection {
     let curr = child.parent;
     while (curr) {
       if (curr === parent) return true;
+      curr = curr.parent;
+    }
+    return false;
+  }
+
+  private hasAncestorFlag(child: THREE.Object3D, flag: string): boolean {
+    let curr = child.parent;
+    while (curr) {
+      if ((curr as any)[flag] === true) return true;
       curr = curr.parent;
     }
     return false;

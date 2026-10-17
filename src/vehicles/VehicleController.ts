@@ -36,6 +36,7 @@ export class VehicleController {
     this.position.y = 0.5;
 
     this.mesh = new THREE.Group();
+    (this.mesh as any).isVehicle = true;
     this.buildVehicleMesh();
     this.mesh.position.copy(this.position);
     this.scene.add(this.mesh);
@@ -198,9 +199,55 @@ export class VehicleController {
     this.mesh.rotation.y = this.yaw;
     this.forward.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
 
-    // Move position
-    const moveStep = new THREE.Vector3().copy(this.forward).multiplyScalar(this.speed * delta);
-    this.position.add(moveStep);
+    // Vehicle Collision Resolution with Map Walls, Barriers & Buildings
+    const vRadius = 1.35; // Physical vehicle collision envelope
+    const stepX = this.forward.x * this.speed * delta;
+    const stepZ = this.forward.z * this.speed * delta;
+
+    // Test X-axis movement
+    const testX = this.position.x + stepX;
+    const boxX = new THREE.Box3(
+      new THREE.Vector3(testX - vRadius, 0.1, this.position.z - vRadius),
+      new THREE.Vector3(testX + vRadius, 1.8, this.position.z + vRadius)
+    );
+    let collideX = false;
+    for (const col of this.colliders) {
+      if (col.intersectsBox(boxX)) {
+        collideX = true;
+        break;
+      }
+    }
+    if (!collideX) {
+      this.position.x = testX;
+    } else {
+      if (Math.abs(this.speed) > 4.0) {
+        this.audioManager.playHurt();
+      }
+      this.speed *= -0.25; // Elastic bounce from wall
+    }
+
+    // Test Z-axis movement
+    const testZ = this.position.z + stepZ;
+    const boxZ = new THREE.Box3(
+      new THREE.Vector3(this.position.x - vRadius, 0.1, testZ - vRadius),
+      new THREE.Vector3(this.position.x + vRadius, 1.8, testZ + vRadius)
+    );
+    let collideZ = false;
+    for (const col of this.colliders) {
+      if (col.intersectsBox(boxZ)) {
+        collideZ = true;
+        break;
+      }
+    }
+    if (!collideZ) {
+      this.position.z = testZ;
+    } else {
+      if (Math.abs(this.speed) > 4.0) {
+        this.audioManager.playHurt();
+      }
+      this.speed *= -0.25;
+    }
+
     this.mesh.position.copy(this.position);
 
     // Physically spin wheels based on travel distance

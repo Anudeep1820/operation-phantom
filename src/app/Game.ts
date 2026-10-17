@@ -90,10 +90,10 @@ export class Game {
     // 2. Scene & Azure Daylight Atmospheric Fog (Zero Darkness!)
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb);
-    this.scene.fog = new THREE.FogExp2(0xdbeafe, 0.002);
+    this.scene.fog = new THREE.FogExp2(0xdbeafe, 0.001);
 
-    // 3. Camera
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 500);
+    // 3. Camera (900m far plane for massive open world exploration)
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 900);
     this.scene.add(this.camera);
 
     // 4. Audio Manager

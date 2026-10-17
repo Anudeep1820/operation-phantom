@@ -941,6 +941,103 @@ canvas {
   border-radius: 50%;
 }
 
+/* Holographic Reflex Sight Overlay (AR-7 and Viper-9 ADS) */
+.reflex-sight-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.reflex-reticle {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reflex-ring {
+  width: 38px;
+  height: 38px;
+  border: 1.5px solid rgba(239, 68, 68, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.6), inset 0 0 6px rgba(239, 68, 68, 0.3);
+}
+
+.reflex-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 4px;
+  background: #ff2222;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #ff2222, 0 0 14px rgba(239, 68, 68, 0.8);
+}
+
+.reflex-tick {
+  position: absolute;
+  background: rgba(239, 68, 68, 0.8);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+.reflex-tick-t {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1.5px;
+  height: 6px;
+}
+
+.reflex-tick-b {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1.5px;
+  height: 6px;
+}
+
+.reflex-tick-l {
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 1.5px;
+}
+
+.reflex-tick-r {
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 1.5px;
+}
+
+/* Green Tritium Optic Mode (Viper-9) */
+.reflex-sight-overlay.green-optic .reflex-ring {
+  border-color: rgba(16, 185, 129, 0.9);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6), inset 0 0 6px rgba(16, 185, 129, 0.3);
+}
+
+.reflex-sight-overlay.green-optic .reflex-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981, 0 0 14px rgba(16, 185, 129, 0.8);
+}
+
+.reflex-sight-overlay.green-optic .reflex-tick {
+  background: rgba(16, 185, 129, 0.85);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+
 /* Damage Flash */
 .damage-flash {
   position: absolute;

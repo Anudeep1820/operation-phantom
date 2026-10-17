@@ -192,13 +192,34 @@ export class BotController {
     this.rightArm.add(rifle);
     this.mesh.add(this.rightArm);
 
+    // Tag every single mesh on the bot so hit detection reliably registers on all parts
+    (this.mesh as any).botInstance = this;
+    this.mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        (child as any).botInstance = this;
+      }
+    });
+
+    // Tag head group and all head accessories for headshots
+    headGroup.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        (child as any).botInstance = this;
+        (child as any).isHead = true;
+      }
+    });
+    (headGroup as any).isHead = true;
+    (this.headMesh as any).isHead = true;
+    (helmet as any).isHead = true;
+    (visor as any).isHead = true;
+
     this.scene.add(this.mesh);
     this.spawn(spawnPos);
   }
 
   public spawn(pos: THREE.Vector3): void {
-    this.position.copy(pos);
-    this.mesh.position.copy(this.position);
+    // Force GROUND HEIGHT 0: Enemies never float in the air!
+    this.position.set(pos.x, 0, pos.z);
+    this.mesh.position.set(pos.x, 0, pos.z);
     this.health = this.maxHealth;
     this.armor = 50;
     this.isAlive = true;
@@ -268,27 +289,42 @@ export class BotController {
       return;
     }
 
+    // STRICT GROUND CLAMP: Bots never float in the air
+    this.mesh.position.y = 0;
     this.position.set(this.mesh.position.x, 0, this.mesh.position.z);
-    const toPlayer = new THREE.Vector3().subVectors(playerPos, this.mesh.position);
-    const distToPlayer = toPlayer.length();
-    const hasLOS = distToPlayer < this.detectionRange && this.checkLineOfSight(playerPos);
 
-    if (hasLOS) {
+    const toPlayer = new THREE.Vector3().subVectors(playerPos, this.mesh.position);
+    toPlayer.y = 0;
+    const distToPlayer = toPlayer.length();
+
+    // Vision cone: Bot forward direction vs direction to player
+    const botForward = new THREE.Vector3(Math.sin(this.mesh.rotation.y), 0, Math.cos(this.mesh.rotation.y));
+    const dirToPlayer = toPlayer.clone().normalize();
+    const visionDot = botForward.dot(dirToPlayer); // 1 = right in front, 0 = 90 deg side, -1 = behind
+
+    // Bot ONLY detects player if within 28m awareness radius AND (in ~80° vision cone OR close sound < 6m)
+    const inVisionCone = visionDot > 0.35 || distToPlayer < 6.0;
+    const canSeePlayer = inVisionCone && distToPlayer <= this.detectionRange && this.checkLineOfSight(playerPos);
+
+    if (canSeePlayer) {
       this.state = 'ENGAGE';
     } else if (this.state === 'ENGAGE') {
-      this.state = 'PATROL';
-      this.reactionDelayTimer = 0.7; // Reset reaction time
+      // Disengage if player leaves radius or moves behind cover
+      if (distToPlayer > this.detectionRange * 1.15 || !this.checkLineOfSight(playerPos)) {
+        this.state = 'PATROL';
+        this.reactionDelayTimer = 0.8;
+      }
     }
 
     if (this.state === 'ENGAGE') {
-      this.handleEngage(delta, toPlayer, distToPlayer, onShootPlayer, canShootThisTick);
+      this.handleEngage(delta, toPlayer, distToPlayer, onShootPlayer, canShootThisTick && canSeePlayer);
     } else {
       this.handlePatrol(delta);
     }
   }
 
   private checkLineOfSight(targetPos: THREE.Vector3): boolean {
-    const origin = new THREE.Vector3(this.mesh.position.x, 1.5, this.mesh.position.z);
+    const origin = new THREE.Vector3(this.mesh.position.x, 1.4, this.mesh.position.z);
     const dir = new THREE.Vector3().subVectors(targetPos, origin).normalize();
     const ray = new THREE.Ray(origin, dir);
     const dist = origin.distanceTo(targetPos);
@@ -309,14 +345,17 @@ export class BotController {
     onShootPlayer?: (dmg: number) => void,
     canShootThisTick: boolean = true
   ): void {
+    this.mesh.position.y = 0;
     const angle = Math.atan2(toPlayer.x, toPlayer.z);
     this.mesh.rotation.y = angle;
 
-    // Tactical repositioning & walking
-    if (dist > 16) {
+    // Tactical repositioning: DO NOT blindly sprint across the whole map towards the player
+    // Instead hold guard post, only shifting slightly if within combat distance
+    if (dist > 16 && dist < 26) {
       const forward = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
-      this.mesh.position.addScaledVector(forward, this.moveSpeed * 0.6 * delta);
-      this.animateLegs(delta, 1.5);
+      this.mesh.position.addScaledVector(forward, this.moveSpeed * 0.35 * delta);
+      this.mesh.position.y = 0;
+      this.animateLegs(delta, 1.2);
     } else {
       this.resetLegs();
     }
@@ -327,11 +366,11 @@ export class BotController {
       return;
     }
 
-    // Coordinated Firing: Only fires if authorized to prevent unfair multi-bot firing!
+    // Coordinated Firing: Only fires if authorized and has line-of-sight!
     this.fireCooldown -= delta;
-    if (this.fireCooldown <= 0 && canShootThisTick) {
+    if (this.fireCooldown <= 0 && canShootThisTick && dist <= this.detectionRange) {
       this.fireWeapon(onShootPlayer, dist);
-      this.fireCooldown = 1.2 + Math.random() * 0.8; // Controlled human cadence
+      this.fireCooldown = 1.3 + Math.random() * 0.7; // Controlled human cadence
     }
   }
 
@@ -349,6 +388,7 @@ export class BotController {
   }
 
   private handlePatrol(delta: number): void {
+    this.mesh.position.y = 0;
     if (this.waypoints.length === 0) return;
 
     const targetWp = this.waypoints[this.currentWaypointIndex];
@@ -362,8 +402,9 @@ export class BotController {
       toWp.normalize();
       const angle = Math.atan2(toWp.x, toWp.z);
       this.mesh.rotation.y = angle;
-      this.mesh.position.addScaledVector(toWp, this.moveSpeed * delta);
-      this.animateLegs(delta, 2.0);
+      this.mesh.position.addScaledVector(toWp, this.moveSpeed * 0.6 * delta);
+      this.mesh.position.y = 0;
+      this.animateLegs(delta, 1.5);
     }
   }
 

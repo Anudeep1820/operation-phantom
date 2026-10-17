@@ -28,12 +28,20 @@ export class BotManager {
 
     const botNames = ['Wraith-01', 'Specter-02', 'Vandal-03', 'Apex-04'];
     for (let i = 0; i < Math.min(count, spawns.length); i++) {
-      // Offset waypoints slightly per bot for distinct routes
-      const botWaypoints = [...waypoints].sort(() => Math.random() - 0.5);
+      const spawn = spawns[i];
+      // Keep bots stationed at their respective outposts by giving them local waypoints!
+      const nearbyWaypoints = waypoints.filter(wp => wp.distanceTo(spawn) < 65);
+      const botWaypoints = nearbyWaypoints.length >= 2 ? nearbyWaypoints : [
+        new THREE.Vector3(spawn.x + 12, 0, spawn.z + 8),
+        new THREE.Vector3(spawn.x - 10, 0, spawn.z + 14),
+        new THREE.Vector3(spawn.x + 8, 0, spawn.z - 12),
+        new THREE.Vector3(spawn.x - 12, 0, spawn.z - 8)
+      ];
+
       const bot = new BotController(
         `bot-${i}`,
         botNames[i] || `Omega-0${i + 1}`,
-        spawns[i],
+        spawn,
         botWaypoints,
         this.scene,
         this.audioManager,
@@ -52,8 +60,11 @@ export class BotManager {
     const meshes: THREE.Mesh[] = [];
     for (const b of this.bots) {
       if (b.isAlive) {
-        meshes.push(b.headMesh);
-        meshes.push(b.bodyMesh);
+        b.mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            meshes.push(child);
+          }
+        });
       }
     }
     return meshes;

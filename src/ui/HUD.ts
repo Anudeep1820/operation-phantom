@@ -11,6 +11,7 @@ export class HUD {
   private weaponNameEl!: HTMLElement;
   private crosshairEl!: HTMLElement;
   private sniperScopeEl!: HTMLElement;
+  private reflexSightEl!: HTMLElement;
   private hitmarkerEl!: HTMLElement;
   private damageFlashEl!: HTMLElement;
   private totemFlashEl!: HTMLElement;
@@ -86,7 +87,7 @@ export class HUD {
         <div class="ch-dot"></div>
       </div>
 
-      <!-- Sniper Scope Tactical Overlay -->
+      <!-- Sniper Scope Tactical Overlay (Longshot) -->
       <div id="sniper-scope-overlay" class="sniper-scope-overlay">
         <div class="scope-cross-h"></div>
         <div class="scope-cross-v"></div>
@@ -94,6 +95,18 @@ export class HUD {
         <div class="scope-red-dot"></div>
         <div class="scope-ticks-left"></div>
         <div class="scope-ticks-right"></div>
+      </div>
+
+      <!-- Holographic / Reflex Sight Overlay (AR-7 Striker & Viper-9 ADS) -->
+      <div id="reflex-sight-overlay" class="reflex-sight-overlay" style="display: none;">
+        <div class="reflex-reticle">
+          <div class="reflex-ring"></div>
+          <div class="reflex-dot"></div>
+          <div class="reflex-tick reflex-tick-t"></div>
+          <div class="reflex-tick reflex-tick-b"></div>
+          <div class="reflex-tick reflex-tick-l"></div>
+          <div class="reflex-tick reflex-tick-r"></div>
+        </div>
       </div>
 
       <!-- Hitmarker Feedback -->
@@ -169,6 +182,7 @@ export class HUD {
     this.weaponNameEl = this.container.querySelector('#hud-weapon-name')!;
     this.crosshairEl = this.container.querySelector('#hud-crosshair')!;
     this.sniperScopeEl = this.container.querySelector('#sniper-scope-overlay')!;
+    this.reflexSightEl = this.container.querySelector('#reflex-sight-overlay')!;
     this.hitmarkerEl = this.container.querySelector('#hud-hitmarker')!;
     this.damageFlashEl = this.container.querySelector('#damage-flash')!;
     this.totemFlashEl = this.container.querySelector('#totem-flash')!;
@@ -267,13 +281,28 @@ export class HUD {
     this.ammoValEl.textContent = `${currentAmmo}`;
     this.reserveValEl.textContent = `${reserveAmmo}`;
 
-    // Sniper scope visibility
-    if (weapon.id === 'LONGSHOT' && isADS) {
-      this.sniperScopeEl.style.display = 'block';
-      this.crosshairEl.style.display = 'none';
+    if (isADS) {
+      if (weapon.id === 'LONGSHOT') {
+        // High-Magnification Sniper Scope
+        this.sniperScopeEl.style.display = 'block';
+        this.reflexSightEl.style.display = 'none';
+        this.crosshairEl.style.display = 'none';
+      } else {
+        // Holographic Red Dot Reflex Sight for AR-7 Striker & Viper-9!
+        this.sniperScopeEl.style.display = 'none';
+        this.reflexSightEl.style.display = 'flex';
+        this.crosshairEl.style.display = 'none';
+
+        if (weapon.id === 'VIPER9') {
+          this.reflexSightEl.classList.add('green-optic');
+        } else {
+          this.reflexSightEl.classList.remove('green-optic');
+        }
+      }
     } else {
       this.sniperScopeEl.style.display = 'none';
-      this.crosshairEl.style.display = isADS ? 'none' : 'block';
+      this.reflexSightEl.style.display = 'none';
+      this.crosshairEl.style.display = 'block';
     }
   }
 
@@ -327,6 +356,7 @@ export class HUD {
     this.deathCountdownEl.textContent = `${countdownSec.toFixed(1)}s`;
     this.crosshairEl.style.display = 'none';
     this.sniperScopeEl.style.display = 'none';
+    this.reflexSightEl.style.display = 'none';
   }
 
   public hideDeathOverlay(): void {
