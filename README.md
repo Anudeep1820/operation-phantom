@@ -1,7 +1,20 @@
 # OPERATION PHANTOM : MOBILE
 > High-Performance 3D Browser Tactical First-Person Shooter
 
-**OPERATION PHANTOM : MOBILE** is an original, polished, browser-playable 3D first-person tactical shooter engineered for modern mobile browsers (Android / iOS) and desktop browsers. Built with **TypeScript**, **Three.js**, and **Vite**, it delivers responsive tactical gunplay, original 3D maps, autonomous AI bots, dynamic weapon recoil, and a mobile-first touch HUD without requiring native APK installation.
+[![Play Live on Vercel](https://img.shields.io/badge/PLAY%20LIVE-ON%20VERCEL-00f0ff?style=for-the-badge&logo=vercel&logoColor=black)](https://operation-phantom-ten.vercel.app)
+[![GitHub Repository](https://img.shields.io/badge/GITHUB-REPO-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Anudeep1820/operation-phantom)
+[![Built with Three.js](https://img.shields.io/badge/Three.js-WebGL-black?style=for-the-badge&logo=three.js&logoColor=white)](https://threejs.org/)
+[![Built with TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+
+---
+
+### 🌐 Live Production URL
+### 👉 **[https://operation-phantom-ten.vercel.app](https://operation-phantom-ten.vercel.app)** 👈
+*(Click to play instantly in your browser — zero downloads, zero APK required!)*
+
+---
+
+**OPERATION PHANTOM : MOBILE** is an original, polished, browser-playable 3D first-person tactical shooter engineered for modern mobile browsers (Android / iOS) and desktop browsers. Built with **TypeScript**, **Three.js**, and **Vite**, and deployed globally on **Vercel**, it delivers responsive tactical gunplay, open-world vehicle driving, autonomous AI bots, dynamic weapon recoil, and a mobile-first touch HUD.
 
 ---
 
@@ -12,16 +25,27 @@
   - Movement mechanics: walk, sprint, crouch, jump, gravity, and stable AABB map collision detection.
   - Camera bobbing, weapon sway, and recoil spring recovery.
   - Smooth Aim-Down-Sights (ADS) FOV zoom with procedural weapon sight alignment.
-- **Initial Weapon Arsenal:**
-  - **Viper-9 (Tactical Pistol):** Semi-automatic, 15 rounds, 34 DMG, fast slide reciprocation, snappy ADS.
-  - **AR-7 Striker (Assault Rifle):** Full-automatic (620 RPM), 30 rounds, 26 DMG, holographic sight, tactical recoil kick.
-  - **Longshot (Anti-Materiel Sniper):** Bolt-action, 5 rounds, 115 DMG (lethal 299 headshot), milliradian high-magnification scope overlay.
-- **Original 3D Map: Neon District:**
-  - Night urban setting with multi-story buildings, accessible sniper balconies, loading bay ramps, shipping containers, and concrete jersey barriers.
-  - Dynamic streetlights, neon emissive signage, and tactical cover chokepoints.
-- **Autonomous Practice Bots (Omega Squad):**
-  - Fully local AI opponents with patrol navigation, line-of-sight raycasting, human-like reaction delays, tactical burst fire, and cover usage.
-  - Distinct hitboxes: Head (2.2x - 2.6x headshot critical multiplier) and Body/Limbs.
+- **Weapon Arsenal with Full Tactical Scopes:**
+  - **Viper-9 (Tactical Pistol):** Semi-automatic, 15 rounds, 34 DMG, green tritium dot reflex sight.
+  - **AR-7 Striker (Assault Rifle):** Full-automatic (620 RPM), 30 rounds, 26 DMG, holographic illuminated red dot reflex sight.
+  - **Longshot (Sniper):** Bolt-action, 5 rounds, 115 DMG, 16° zoom mil-dot precision sniper scope.
+- **🚗 Drivable Tactical Military Buggy:**
+  - Fully drivable open-world vehicle with throttle, steering, physical spinning wheels, dual spotlights, and Box3 building collision detection.
+  - Mount/dismount via `[E]` key or touch `🚗 DRIVE` button.
+  - 3rd-person chase camera and vehicle bot-crushing impact damage.
+- **⚚ Totem of Undying Shield:**
+  - Automatically intercepts fatal damage with radiant golden revival flash, restoring 100 HP + 50 AP and granting 3.5s immunity.
+- **🌍 600m × 600m Open-World Compound:**
+  - Expansive daylight map featuring 560m asphalt highway network and 4 distinct tactical bases:
+    - South Forward Operating Base & Motor Pool
+    - Central Crossroads Checkpoint
+    - North Omega Fortress & Silo Depot
+    - East Satellite Communications Outpost
+    - West Industrial Fuel Refinery
+- **Autonomous Outpost Guards:**
+  - Humanoid tactical soldiers with Kevlar helmets, armor plates, and articulated walking legs.
+  - Vision cone detection (~80° forward cone, 28m awareness radius).
+  - Outpost guards patrol local waypoints and only open fire when you are detected.
 - **Procedural Tactical Audio System:**
   - Custom Web Audio API synthesizer for zero-asset-latency, 100% reliable sound effects: distinct gunshots, mechanical reloads, footsteps, bullet impacts, hitmarker dings, hurt audio, and victory/defeat stingers.
 - **Mobile-First Responsive Touch HUD:**
@@ -152,27 +176,27 @@ npm run preview
 
 ---
 
-## 🚀 Deployment to Vercel
+## 🚀 Live Vercel Deployment & Web Access
 
-The repository includes a ready-to-deploy `vercel.json` and production build configuration:
+This game is fully deployed and hosted globally on **Vercel** with automatic continuous deployment (CI/CD) on every Git push:
 
-1. **Push your code to GitHub:**
-   ```bash
-   git add .
-   git commit -m "feat: complete Operation Phantom Mobile tactical FPS"
-   git remote add origin https://github.com/<your-username>/operation-phantom.git
-   git push -u origin main
+- **Official Live Playable Game:** [https://operation-phantom-ten.vercel.app](https://operation-phantom-ten.vercel.app)
+- **GitHub Repository:** [https://github.com/Anudeep1820/operation-phantom](https://github.com/Anudeep1820/operation-phantom)
+
+### How to Play:
+1. Open [https://operation-phantom-ten.vercel.app](https://operation-phantom-ten.vercel.app) on any mobile or desktop web browser.
+2. Tap or click **DEPLOY COMBAT**.
+3. No local setup, no emulator, and no APK downloads needed — it runs 100% on the cloud.
+
+### Linking the Vercel URL on GitHub:
+To show the direct clickable link on your GitHub repository page's right sidebar:
+1. Go to [https://github.com/Anudeep1820/operation-phantom](https://github.com/Anudeep1820/operation-phantom).
+2. Click the ⚙️ gear icon next to **About** on the right side of the repository header.
+3. In the **Website** field, paste:
    ```
-2. **Deploy on Vercel:**
-   - Log in to [Vercel](https://vercel.com).
-   - Click **Add New Project** -> **Import Git Repository**.
-   - Select your `operation-phantom` repository.
-   - Vercel automatically detects the Vite framework:
-     - **Build Command:** `npm run build`
-     - **Output Directory:** `dist`
-   - Click **Deploy**.
-3. **Verify:**
-   - Open your deployed `*.vercel.app` URL on both desktop and mobile devices.
+   https://operation-phantom-ten.vercel.app
+   ```
+4. Click **Save changes**. The live link will be pinned directly on your GitHub repo page!
 
 ---
 
